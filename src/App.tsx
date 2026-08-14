@@ -41,38 +41,38 @@ function cleanTrackInfo(rawTitle: string, rawAuthor?: string): { title: string; 
    ============================================ */
 const Icons = {
   rewindFast: (
-    <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor">
       <path d="M11 6L2 12l9 6V6zm11 0l-9 6l9 6V6z" />
     </svg>
   ),
   prev: (
-    <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor">
       <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
     </svg>
   ),
   play: (
-    <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor">
       <path d="M8 5v14l11-7z" />
     </svg>
   ),
   pause: (
-    <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor">
       <rect x="6" y="5" width="4" height="14" rx="1" />
       <rect x="14" y="5" width="4" height="14" rx="1" />
     </svg>
   ),
   stop: (
-    <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor">
       <rect x="6" y="6" width="12" height="12" rx="1" />
     </svg>
   ),
   next: (
-    <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor">
       <path d="M16 6h2v12h-2zm-12 12l8.5-6L4 6v12z" />
     </svg>
   ),
   ffwdFast: (
-    <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor">
       <path d="M13 6v12l9-6-9-6zm-11 0v12l9-6-9-6z" />
     </svg>
   ),
@@ -138,12 +138,21 @@ function RetroTitleBlock({ isPlaying, tapeName }: { isPlaying: boolean; tapeName
    ============================================ */
 type CassetteStage = 'empty' | 'appearing' | 'sliding' | 'clicking' | 'loaded';
 
+const ENABLE_VU_METER = false;
+
+export interface SavedTape {
+  id: string;
+  name: string;
+}
+
 interface BoomboxProps {
   currentTrack: Track;
   isPlaying: boolean;
   progress: number;
   volume: number;
   playlistName: string;
+  playlistId: string;
+  savedTapes: SavedTape[];
   tracks: Track[];
   onPlayPause: () => void;
   onStop: () => void;
@@ -152,7 +161,11 @@ interface BoomboxProps {
   onSelectTrack: (track: Track, index: number) => void;
   onSeek: (pct: number) => void;
   onVolumeChange: (vol: number) => void;
-  onLoadNewTape: (name: string) => void;
+  onLoadNewTape: (name: string, link?: string) => void;
+  onDeleteTape: (id: string) => void;
+  isVisible: boolean;
+  isIdle: boolean;
+  onToggleVisibility: () => void;
 }
 
 export function CompactVintageBoombox({
@@ -162,6 +175,8 @@ export function CompactVintageBoombox({
   volume,
   tracks = [],
   playlistName,
+  playlistId,
+  savedTapes = [],
   onPlayPause,
   onStop,
   onNext,
@@ -169,7 +184,11 @@ export function CompactVintageBoombox({
   onSeek,
   onVolumeChange,
   onLoadNewTape,
+  onDeleteTape,
   onSelectTrack,
+  isVisible,
+  isIdle,
+  onToggleVisibility,
 }: BoomboxProps) {
   const [tapeStage, setTapeStage] = useState<CassetteStage>('loaded');
   const [activeTapeLabel, setActiveTapeLabel] = useState(playlistName || 'CUSTOM MIXTAPE');
@@ -179,6 +198,30 @@ export function CompactVintageBoombox({
   const [tempTapeName, setTempTapeName] = useState('Custom Mixtape');
   const [tempTapeLink, setTempTapeLink] = useState('');
   const [activePianoBtn, setActivePianoBtn] = useState<string | null>(null);
+
+  const isDraggingVol = useRef(false);
+  const startY = useRef(0);
+  const startVol = useRef(0);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    isDraggingVol.current = true;
+    startY.current = e.clientY;
+    startVol.current = volume;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDraggingVol.current) return;
+    const deltaY = startY.current - e.clientY; // Up is positive
+    const sensitivity = 0.01; // 1% per pixel
+    const newVol = Math.max(0, Math.min(1, startVol.current + deltaY * sensitivity));
+    onVolumeChange(newVol);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    isDraggingVol.current = false;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
 
   const toggleTapeMenu = (targetTab: 'tapes' | 'tracks') => {
     mechanicalAudio.playPianoKeyClack();
@@ -256,7 +299,8 @@ export function CompactVintageBoombox({
   };
 
   return (
-    <div className="boombox-3d-scene-container">
+    <>
+    <div className={`boombox-3d-scene-container ${!isVisible ? 'boombox-hidden' : ''}`}>
       <div className="boombox-3d-box">
         
         {/* Compact playlist / cassette dock. */}
@@ -287,10 +331,34 @@ export function CompactVintageBoombox({
 
             {menuTab === 'tapes' ? (
               <div className="minimal-items-grid">
-                <button className={`minimal-item minimal-item--active`}>
-                  <span className="minimal-title">Custom Mixtape</span>
-                  <span className="minimal-tag">YouTube Playlist</span>
-                </button>
+                {savedTapes.map((tape) => {
+                  const isActive = tape.id === playlistId;
+                  return (
+                    <div 
+                      key={tape.id}
+                      className={`minimal-item ${isActive ? 'minimal-item--active' : ''}`}
+                      style={{ cursor: isActive ? 'default' : 'pointer', paddingRight: '2em' }}
+                      onClick={() => {
+                        if (isActive) return;
+                        triggerCassetteSequence(tape.name);
+                        onLoadNewTape(tape.name, tape.id);
+                        setMenuTab('tracks');
+                      }}
+                    >
+                      <span className="minimal-title">{tape.name}</span>
+                      <span className="minimal-tag">YouTube Playlist</span>
+                      {savedTapes.length > 1 && (
+                        <button 
+                          className="tape-delete-btn" 
+                          onClick={(e) => { e.stopPropagation(); onDeleteTape(tape.id); }}
+                          title="Delete Tape"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
 
                 <div className="minimal-tape-cta" style={{ gridColumn: '1 / -1', marginTop: '10px' }}>
                   <button className="tape-cta-btn" onClick={() => setShowAddModal(true)} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px dashed rgba(255,255,255,0.3)', borderRadius: '6px', cursor: 'pointer', fontFamily: 'monospace' }}>
@@ -351,8 +419,12 @@ export function CompactVintageBoombox({
                 <div className="minimal-modal-actions">
                   <button className="minimal-modal-btn minimal-modal-btn--cancel" onClick={() => setShowAddModal(false)}>Cancel</button>
                   <button className="minimal-modal-btn minimal-modal-btn--submit" onClick={() => {
-                    onLoadNewTape(tempTapeName || 'Custom Mixtape');
+                    const finalName = tempTapeName || 'Custom Mixtape';
+                    triggerCassetteSequence(finalName);
+                    onLoadNewTape(finalName, tempTapeLink);
                     setShowAddModal(false);
+                    setTempTapeLink('');
+                    setMenuTab('tracks');
                   }}>Add Tape</button>
                 </div>
               </div>
@@ -456,6 +528,28 @@ export function CompactVintageBoombox({
               )}
             </div>
 
+            {/* VU METER */}
+            {ENABLE_VU_METER && (
+              <div className="vu-meter-panel">
+                <div className="vu-channel">
+                  <span className="vu-label">L</span>
+                  <div className="vu-leds">
+                    {[...Array(12)].map((_, i) => (
+                      <div key={`l-${i}`} className={`vu-led vu-led--${i < 7 ? 'green' : i < 10 ? 'yellow' : 'red'} ${isPlaying && tapeStage === 'loaded' ? 'vu-led--active' : ''}`} style={{ animationDelay: `${Math.random() * 0.5}s`, animationDuration: `${0.2 + Math.random() * 0.3}s` }} />
+                    ))}
+                  </div>
+                </div>
+                <div className="vu-channel">
+                  <span className="vu-label">R</span>
+                  <div className="vu-leds">
+                    {[...Array(12)].map((_, i) => (
+                      <div key={`r-${i}`} className={`vu-led vu-led--${i < 7 ? 'green' : i < 10 ? 'yellow' : 'red'} ${isPlaying && tapeStage === 'loaded' ? 'vu-led--active' : ''}`} style={{ animationDelay: `${Math.random() * 0.5}s`, animationDuration: `${0.2 + Math.random() * 0.3}s` }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* CASSETTE DECK WINDOW */}
             <div className="cassette-deck-housing">
               <div className="metal-screw metal-screw--tl" />
@@ -550,8 +644,11 @@ export function CompactVintageBoombox({
                   <span className="vol-label">VOL</span>
                   <div
                     className="rotary-knob"
-                    style={{ transform: `rotate(${knobAngle}deg)` }}
-                    onClick={() => onVolumeChange(volume >= 1 ? 0.2 : volume + 0.2)}
+                    style={{ transform: `rotate(${knobAngle}deg)`, touchAction: 'none' }}
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerCancel={handlePointerUp}
                   >
                     <div className="knob-notch" />
                   </div>
@@ -603,8 +700,67 @@ export function CompactVintageBoombox({
         </div>
       )}
 
+      </div>
 
-    </div>
+      {/* MINI PLAYER BAR (Appears when boombox is hidden) */}
+      <div className={`mini-player-bar ${!isVisible ? 'mini-player-bar--visible' : ''}`}>
+        <div className="mini-progress-track" onClick={handleSeekClick}>
+          <div className="mini-progress-bar" style={{ width: `${progress * 100}%` }} />
+        </div>
+        <button className="mini-btn" onClick={onToggleVisibility} title="Show Boombox">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect>
+            <circle cx="7" cy="13" r="2.5"></circle>
+            <circle cx="17" cy="13" r="2.5"></circle>
+            <path d="M10 9h4"></path>
+            <path d="M6 6v-2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v2"></path>
+          </svg>
+        </button>
+        <div className="mini-track-info">
+          <span className="mini-title">{trackInfo.title}</span>
+          <span className="mini-artist">{trackInfo.artist}</span>
+        </div>
+        <button className="mini-btn" onClick={onPrev}>
+          {Icons.prev}
+        </button>
+        <button className="mini-btn" onClick={onPlayPause}>
+          {isPlaying ? Icons.pause : Icons.play}
+        </button>
+        <button className="mini-btn" onClick={onNext}>
+          {Icons.next}
+        </button>
+        <button className="mini-btn mini-btn--menu" onClick={() => {
+          onToggleVisibility();
+          setMenuTab('tracks');
+          setShowTapeMenu(true);
+        }}>
+          TRACKS
+        </button>
+        <button className="mini-btn mini-btn--menu" onClick={() => {
+          onToggleVisibility();
+          setMenuTab('tapes');
+          setShowTapeMenu(true);
+        }}>
+          TAPES
+        </button>
+      </div>
+      
+      {/* HIDE BOOMBOX BTN (Appears when boombox is visible) */}
+      <button 
+        className={`hide-boombox-btn ${isVisible && !isIdle ? 'hide-boombox-btn--visible' : ''}`}
+        onClick={onToggleVisibility}
+        title="Hide Boombox"
+      >
+        <span>HIDE</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect>
+          <circle cx="7" cy="13" r="2.5"></circle>
+          <circle cx="17" cy="13" r="2.5"></circle>
+          <path d="M10 9h4"></path>
+          <path d="M6 6v-2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v2"></path>
+        </svg>
+      </button>
+    </>
   );
 }
 
@@ -622,6 +778,13 @@ const INITIAL_TRACK: Track = {
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [playlistName, setPlaylistName] = useState(() => localStorage.getItem('yaadein_playlist') || 'CUSTOM MIXTAPE');
+  const [playlistId, setPlaylistId] = useState(() => localStorage.getItem('yaadein_playlist_id') || YOUTUBE_PLAYLIST_ID);
+  
+  const [savedTapes, setSavedTapes] = useState<SavedTape[]>(() => {
+    const saved = localStorage.getItem('yaadein_saved_tapes');
+    if (saved) return JSON.parse(saved);
+    return [{ id: YOUTUBE_PLAYLIST_ID, name: 'CUSTOM MIXTAPE' }];
+  });
   
   const [tracks, setTracks] = useState<Track[]>([]);
   
@@ -629,6 +792,8 @@ export default function App() {
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [isBoomboxVisible, setIsBoomboxVisible] = useState(true);
+  const [isIdle, setIsIdle] = useState(false);
   
   const [volume, setVolume] = useState(() => {
     const savedVol = localStorage.getItem('yaadein_volume');
@@ -637,6 +802,8 @@ export default function App() {
 
   useEffect(() => { localStorage.setItem('yaadein_volume', volume.toString()); }, [volume]);
   useEffect(() => { localStorage.setItem('yaadein_playlist', playlistName); }, [playlistName]);
+  useEffect(() => { localStorage.setItem('yaadein_playlist_id', playlistId); }, [playlistId]);
+  useEffect(() => { localStorage.setItem('yaadein_saved_tapes', JSON.stringify(savedTapes)); }, [savedTapes]);
   useEffect(() => { if (currentTrack && currentTrack.id) localStorage.setItem('yaadein_track_id', currentTrack.id); }, [currentTrack]);
 
 
@@ -671,6 +838,25 @@ export default function App() {
     img.src = mainScene;
     img.onload = () => setTimeout(() => setLoading(false), 500);
     img.onerror = () => setTimeout(() => setLoading(false), 500);
+  }, []);
+
+  useEffect(() => {
+    let timeout: number;
+    const handleActivity = () => {
+      setIsIdle(false);
+      clearTimeout(timeout);
+      timeout = window.setTimeout(() => setIsIdle(true), 3000);
+    };
+    
+    window.addEventListener('mousemove', handleActivity);
+    window.addEventListener('touchstart', handleActivity);
+    handleActivity();
+    
+    return () => {
+      window.removeEventListener('mousemove', handleActivity);
+      window.removeEventListener('touchstart', handleActivity);
+      clearTimeout(timeout);
+    };
   }, []);
 
   useEffect(() => {
@@ -725,7 +911,7 @@ export default function App() {
     if (!tracks.length) return;
     const currentIndex = Math.max(0, tracks.findIndex((track) => track.youtubeId === currentTrack.youtubeId));
     const nextIndex = (currentIndex + 1) % tracks.length;
-    handleSelectTrack(tracks[nextIndex], true, nextIndex);
+    handleSelectTrack(tracks[nextIndex], true);
   }, [currentTrack.youtubeId, handleSelectTrack, tracks]);
 
   const handlePrev = useCallback(() => {
@@ -737,7 +923,7 @@ export default function App() {
     if (!tracks.length) return;
     const currentIndex = Math.max(0, tracks.findIndex((track) => track.youtubeId === currentTrack.youtubeId));
     const previousIndex = (currentIndex - 1 + tracks.length) % tracks.length;
-    handleSelectTrack(tracks[previousIndex], true, previousIndex);
+    handleSelectTrack(tracks[previousIndex], true);
   }, [currentTrack.youtubeId, handleSelectTrack, progress, tracks]);
 
   const handleSeek = useCallback(async (pct: number) => {
@@ -752,6 +938,9 @@ export default function App() {
 
   const handleVolumeChange = useCallback((vol: number) => {
     setVolume(vol);
+    if (ytPlayerRef.current) {
+      ytPlayerRef.current.setVolume(vol * 100);
+    }
   }, []);
 
   const hydratePlaylist = useCallback(async (player: YouTubePlayer) => {
@@ -798,8 +987,33 @@ export default function App() {
     }
   }, []);
 
-  const handleLoadNewTape = useCallback((name: string) => {
+  const handleLoadNewTape = useCallback((name: string, link?: string) => {
     setPlaylistName(name);
+    setIsPlaying(false);
+    if (link) {
+      let extractedId = link.trim();
+      try {
+        const url = new URL(extractedId);
+        const listParam = url.searchParams.get('list');
+        if (listParam) extractedId = listParam;
+      } catch {
+        // fallback to raw string if it's not a URL
+      }
+      setPlaylistId(extractedId);
+      setTracks([]); // Clear UI while new playlist loads
+      
+      setSavedTapes((prev) => {
+        if (prev.some((t) => t.id === extractedId)) return prev;
+        return [...prev, { id: extractedId, name }];
+      });
+      
+      // Optionally reset the saved track since it's a new playlist
+      localStorage.removeItem('yaadein_track_id');
+    }
+  }, []);
+
+  const handleDeleteTape = useCallback((id: string) => {
+    setSavedTapes((prev) => prev.filter(t => t.id !== id));
   }, []);
 
   const syncCurrentTrack = useCallback(async (player: YouTubePlayer) => {
@@ -807,9 +1021,21 @@ export default function App() {
       const data = player.getVideoData();
       const duration = await player.getDuration();
       if (data && data.video_id && duration > 0) {
-        setCurrentTrack((current) => current.youtubeId === data.video_id
-          ? { ...current, duration }
-          : current);
+        setTracks((currentTracks) => {
+          const matchingTrack = currentTracks.find((t) => t.youtubeId === data.video_id);
+          setCurrentTrack((current) => {
+            if (current.youtubeId === data.video_id) return { ...current, duration };
+            if (matchingTrack) return { ...matchingTrack, duration };
+            return {
+              id: data.video_id,
+              youtubeId: data.video_id,
+              title: data.title || 'Unknown Track',
+              artist: data.author || 'Unknown Artist',
+              duration,
+            };
+          });
+          return currentTracks;
+        });
       }
     } catch { /* ignore */ }
   }, []);
@@ -834,6 +1060,14 @@ export default function App() {
     }
   }, [handleNext, syncCurrentTrack, hydratePlaylist]);
 
+  const handlePlayerError = useCallback((event: YouTubeEvent) => {
+    console.warn('YouTube Error:', event.data, '- Skipping broken track...');
+    // Introduce a tiny delay so if multiple tracks are broken in a row, we don't spam the API infinitely in a single tick
+    setTimeout(() => {
+      handleNext();
+    }, 500);
+  }, [handleNext]);
+
   return (
     <>
       <LoadingScreen visible={loading} />
@@ -850,6 +1084,8 @@ export default function App() {
           progress={progress}
           volume={volume}
           playlistName={playlistName}
+          playlistId={playlistId}
+          savedTapes={savedTapes}
           tracks={tracks}
           onPlayPause={handlePlayPause}
           onStop={handleStop}
@@ -859,14 +1095,19 @@ export default function App() {
           onSeek={handleSeek}
           onVolumeChange={handleVolumeChange}
           onLoadNewTape={handleLoadNewTape}
+          onDeleteTape={handleDeleteTape}
+          isVisible={isBoomboxVisible}
+          isIdle={isIdle}
+          onToggleVisibility={() => setIsBoomboxVisible(!isBoomboxVisible)}
         />
       </div>
 
-      <div style={{ position: 'fixed', top: '-9999px', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' }}>
+      <div style={{ position: 'fixed', bottom: 0, right: 0, width: '200px', height: '200px', opacity: 0.001, pointerEvents: 'none', zIndex: -999 }}>
         <YouTube
+          key={playlistId}
           opts={{
-            width: '1',
-            height: '1',
+            width: '200',
+            height: '200',
             playerVars: {
               autoplay: 0,
               controls: 0,
@@ -874,12 +1115,13 @@ export default function App() {
               fs: 0,
               iv_load_policy: 3,
               listType: 'playlist' as any,
-              list: YOUTUBE_PLAYLIST_ID,
+              list: playlistId,
               origin: window.location.origin,
             },
           }}
           onReady={onPlayerReady}
           onStateChange={onPlayerStateChange}
+          onError={handlePlayerError}
         />
       </div>
     </>
