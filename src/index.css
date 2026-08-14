@@ -42,18 +42,7 @@ html, body, #root { width: 100%; height: 100%; overflow: hidden; background: var
 body { font-family: var(--font-body); color: var(--cream); -webkit-font-smoothing: antialiased; }
 button { font-family: inherit; border: none; background: none; color: inherit; outline: none; cursor: pointer; }
 
-/* CUSTOM CURSOR */
-@media (pointer: fine) {
-  html, body, *, button, a { cursor: none !important; }
-}
 
-.custom-cursor {
-  position: fixed; top: 0; left: 0; width: 10px; height: 10px;
-  background: #ffb74d; border-radius: 50%; pointer-events: none;
-  z-index: 9999; mix-blend-mode: screen; box-shadow: 0 0 12px #ffb74d;
-  transform: translate(calc(var(--cursor-x, -100px) - 50%), calc(var(--cursor-y, -100px) - 50%));
-  transition: width 0.25s, height 0.25s; will-change: transform;
-}
 
 /* ============================================
    SCENE & BACKGROUND
@@ -447,26 +436,17 @@ button { font-family: inherit; border: none; background: none; color: inherit; o
 .minimal-song-artist { font-size: 0.45em; color: #78908a; }
 .minimal-track-row--active .minimal-song-title, .minimal-track-row--active .minimal-song-artist, .minimal-track-row--active .minimal-num { color: #eddda9; }
 
-@media (max-width: 1200px) {
-  .minimal-tape-menu { left: 50%; top: auto; bottom: calc(100% + 1em); width: min(18em, 88vw); transform: translateX(-50%) translateZ(100px); }
-}
-
-@media (max-width: 600px) {
-  .minimal-menu-header { display: flex; }
-  .minimal-tab-bar { grid-column: auto; grid-row: auto; }
-}
-
-/* A long YouTube playlist stays above the boombox and scrolls inside the dock. */
-.minimal-tape-menu {
-  position: absolute;
-  top: auto;
-  right: auto;
-  left: calc(100% + 0.75em);
-  bottom: 0;
-  width: min(16em, calc(100vw - 1.7rem));
-  min-height: 0;
-  max-height: min(23em, 70vh);
-  transform: translateZ(50px);
+@media (max-width: 1024px) {
+  .minimal-tape-menu {
+    left: 50% !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: calc(100% + 0.8em) !important;
+    transform: translateX(-50%) translateZ(100px) !important;
+    width: min(20em, 90vw) !important;
+    max-height: min(24em, 65vh) !important;
+    z-index: 200 !important;
+  }
 }
 
 .menu-close-btn {
@@ -616,7 +596,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; o
    CENTER CONSOLE
    ============================================ */
 .center-console {
-  flex: 1.4; min-width: 0; max-width: 100%;
+  flex: 2.8; min-width: 0; max-width: 100%;
   display: flex; flex-direction: column; gap: 0.5em;
 }
 
@@ -664,7 +644,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; o
    PHYSICAL CONTROLS (PIANO KEYS & VOLUME)
    ============================================ */
 .controls-row {
-  display: flex; align-items: center; justify-content: space-between; gap: 0.3em; width: 100%;
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5em; width: 100%;
 }
 
 .piano-keys-group {
@@ -675,7 +655,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; o
 }
 
 .piano-key-btn {
-  flex: 1; min-width: 0; max-width: 1.65em; height: 1.75em; border-radius: 0.22em;
+  flex: 1; min-width: 0; max-width: 2.3em; height: 1.75em; border-radius: 0.22em;
   background: linear-gradient(180deg, #ede7db 0%, #c4beaf 40%, #8e8879 100%);
   color: #26221c; border: 0.08em solid #fff;
   border-top: 0.1em solid #ffffff;
@@ -716,6 +696,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; o
 .volume-section {
   display: flex; align-items: center; justify-content: center; gap: 0.15em;
   position: relative; flex-shrink: 0; margin-left: 0.1em;
+  font-size: 1.4em; /* Scales up the entire volume UI */
 }
 
 .vol-dial-wrapper {
@@ -781,16 +762,16 @@ button { font-family: inherit; border: none; background: none; color: inherit; o
 .lcd-display--empty { color: var(--lcd-dim); text-shadow: none; }
 
 .lcd-line-title {
-  font-size: 0.82em; font-weight: 800; letter-spacing: 0.04em;
-  color: #f4ff56; text-shadow: 0 0 0.3em rgba(244, 255, 86, 0.5);
+  font-size: 0.9em; font-weight: 800; letter-spacing: 0.05em;
+  color: #fffb8f; text-shadow: 0 0 0.1em rgba(244, 255, 86, 0.9), 0 0 0.3em rgba(244, 255, 86, 0.4);
   width: 100%; max-width: 100%;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   box-sizing: border-box; position: relative; z-index: 2;
 }
 
 .lcd-line-artist {
-  font-size: 0.64em; font-weight: 700; opacity: 0.9; margin-top: 0.05em;
-  color: #c2d829;
+  font-size: 0.68em; font-weight: 700; opacity: 1; margin-top: 0.05em;
+  color: #dced3c;
   width: 100%; max-width: 100%;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   box-sizing: border-box; position: relative; z-index: 2;

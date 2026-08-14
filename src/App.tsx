@@ -5,7 +5,7 @@ import mainScene from '../assets/main-scene.png';
 
 /* Helper to clean YouTube titles into retro song & movie labels */
 function cleanTrackInfo(rawTitle: string, rawAuthor?: string): { title: string; artist: string } {
-  if (!rawTitle) return { title: 'LADKI BADI ANJANI HAI', artist: 'JATIN LALIT - 1992' };
+  if (!rawTitle || rawTitle.includes('NO SIGNAL')) return { title: '■■■ FM 88.5 MHz - NO SIGNAL ■■■', artist: 'AWAITING TRANSMISSION...' };
 
   let cleaned = rawTitle
     .replace(/\(Official.*?\)|\[Official.*?\]|Official Video|Full Song|HD|4K/gi, '')
@@ -394,7 +394,7 @@ export function CompactVintageBoombox({
               <div className="lcd-scanlines"></div>
               {tapeStage === 'loaded' ? (
                 <>
-                  <div className="lcd-line-title" title={trackInfo.title}>{trackInfo.title}</div>
+                  <div className={`lcd-line-title ${currentTrack.id === 'tuning' ? 'lcd-tuning-blink' : ''}`} title={trackInfo.title}>{trackInfo.title}</div>
                   <div className="lcd-line-artist" title={trackInfo.artist}>{trackInfo.artist}</div>
                   <div className="lcd-line-meta">
                     <span className="lcd-icon">{isPlaying ? '▶' : '⏸'}</span>
@@ -568,10 +568,10 @@ export function CompactVintageBoombox({
    APP — MAIN ENTRY
    ============================================ */
 const INITIAL_TRACK: Track = {
-  id: '1',
-  title: 'LADKI BADI ANJANI HAI',
-  artist: 'KUCH KUCH HOTA HAI - 1998',
-  duration: 381,
+  id: 'tuning',
+  title: '■■■ FM 88.5 MHz - NO SIGNAL ■■■',
+  artist: 'AWAITING TRANSMISSION...',
+  duration: 0,
   youtubeId: 'v8P0i9J42kE',
 };
 
@@ -611,11 +611,9 @@ export default function App() {
   useEffect(() => {
     if (window.matchMedia('(hover: none)').matches) return;
     let targetX = 0, targetY = 0, currentX = 0, currentY = 0;
-    let cursorTargetX = -100, cursorTargetY = -100, cursorCurrentX = -100, cursorCurrentY = -100;
     let animationFrameId: number;
 
     const handleMouseMove = (e: MouseEvent) => {
-      cursorTargetX = e.clientX; cursorTargetY = e.clientY;
       targetX = (e.clientX / window.innerWidth - 0.5) * 2;
       targetY = (e.clientY / window.innerHeight - 0.5) * 2;
     };
@@ -624,10 +622,6 @@ export default function App() {
       currentX += (targetX - currentX) * 0.08; currentY += (targetY - currentY) * 0.08;
       document.documentElement.style.setProperty('--mouse-x', currentX.toString());
       document.documentElement.style.setProperty('--mouse-y', currentY.toString());
-      cursorCurrentX += (cursorTargetX - cursorCurrentX) * 0.35;
-      cursorCurrentY += (cursorTargetY - cursorCurrentY) * 0.35;
-      document.documentElement.style.setProperty('--cursor-x', `${cursorCurrentX}px`);
-      document.documentElement.style.setProperty('--cursor-y', `${cursorCurrentY}px`);
       animationFrameId = requestAnimationFrame(updateLoop);
     };
 
@@ -784,9 +778,9 @@ export default function App() {
       if (data && data.video_id) {
         setCurrentTrack((current) => current.youtubeId === data.video_id ? ({
           id: data.video_id,
-          title: data.title || 'LADKI BADI ANJANI HAI',
-          artist: data.author || 'JATIN LALIT • 1992',
-          duration: duration || 381,
+          title: data.title || '■■■ FM 88.5 MHz - NO SIGNAL ■■■',
+          artist: data.author || 'AWAITING TRANSMISSION...',
+          duration: current.duration,
           youtubeId: data.video_id,
         }) : current);
       }
@@ -815,7 +809,6 @@ export default function App() {
 
   return (
     <>
-      <div className="custom-cursor" />
       <LoadingScreen visible={loading} />
 
       <div className="scene" id="immersive-scene">
