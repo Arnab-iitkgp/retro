@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import YouTube, { YouTubeEvent, YouTubePlayer } from 'react-youtube';
 import { Track, YOUTUBE_PLAYLIST_ID, fetchVideoTitle, formatDuration } from './data/tracks';
+import { mechanicalAudio } from './audioEngine';
 import mainScene from '../assets/main-scene.png';
 
 /* Helper to clean YouTube titles into retro song & movie labels */
@@ -171,18 +172,28 @@ export function CompactVintageBoombox({
   onSelectTrack,
 }: BoomboxProps) {
   const [tapeStage, setTapeStage] = useState<CassetteStage>('loaded');
-  const [activeTapeLabel, setActiveTapeLabel] = useState('LATE NIGHT DRIVE ♡');
+  const [activeTapeLabel, setActiveTapeLabel] = useState(playlistName || 'CUSTOM MIXTAPE');
   const [showTapeMenu, setShowTapeMenu] = useState(false);
   const [menuTab, setMenuTab] = useState<'tapes' | 'tracks'>('tapes');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [tempTapeName, setTempTapeName] = useState('Custom Mixtape');
+  const [tempTapeLink, setTempTapeLink] = useState('');
   const [activePianoBtn, setActivePianoBtn] = useState<string | null>(null);
 
   const toggleTapeMenu = (targetTab: 'tapes' | 'tracks') => {
+    mechanicalAudio.playPianoKeyClack();
     if (showTapeMenu && menuTab === targetTab) {
       setShowTapeMenu(false);
+      setShowAddModal(false);
     } else {
       setMenuTab(targetTab);
       setShowTapeMenu(true);
     }
+  };
+
+  const closeTapeMenu = () => {
+    setShowTapeMenu(false);
+    setShowAddModal(false);
   };
 
   const elapsed = Math.floor(progress * (currentTrack.duration || 381));
@@ -192,13 +203,14 @@ export function CompactVintageBoombox({
     if (playlistName) setActiveTapeLabel(playlistName);
   }, [playlistName]);
 
-  const triggerCassetteSequence = (newLabel: string, shouldLoadTape = false) => {
+  const triggerCassetteSequence = (newLabel: string) => {
     setTapeStage('empty');
     if (isPlaying) onPlayPause();
 
     setTimeout(() => {
       setActiveTapeLabel(newLabel);
       setTapeStage('appearing');
+      mechanicalAudio.playTapeSlide();
     }, 350);
 
     setTimeout(() => {
@@ -207,18 +219,20 @@ export function CompactVintageBoombox({
 
     setTimeout(() => {
       setTapeStage('clicking');
+      mechanicalAudio.playPianoKeyClack();
     }, 1400);
 
     setTimeout(() => {
       setTapeStage('loaded');
-      if (shouldLoadTape) onLoadNewTape(newLabel);
     }, 1800);
   };
 
   const handleEjectClick = () => {
+    mechanicalAudio.playPianoKeyClack();
     if (tapeStage === 'loaded') {
       setTapeStage('empty');
       if (isPlaying) onStop();
+      setTimeout(() => mechanicalAudio.playTapeSlide(), 300);
     } else {
       triggerCassetteSequence(activeTapeLabel);
     }
@@ -235,6 +249,7 @@ export function CompactVintageBoombox({
 
   // Helper for satisfying button clicks
   const triggerPianoBtn = (btnName: string, action: () => void) => {
+    mechanicalAudio.playPianoKeyClack();
     setActivePianoBtn(btnName);
     action();
     setTimeout(() => setActivePianoBtn(null), 150);
@@ -246,7 +261,8 @@ export function CompactVintageBoombox({
         
         {/* Compact playlist / cassette dock. */}
         {showTapeMenu && (
-          <div className="minimal-tape-menu" role="dialog" aria-label="Cassette library">
+          <div className="tape-docker-wrapper">
+            <div className="minimal-tape-menu" role="dialog" aria-label="Cassette library">
             <div className="minimal-menu-header">
               <div className="minimal-tab-bar" role="tablist" aria-label="Library view">
                 <button
@@ -266,53 +282,79 @@ export function CompactVintageBoombox({
                   TRACKS
                 </button>
               </div>
-              <button className="minimal-close-btn" onClick={() => setShowTapeMenu(false)} aria-label="Close cassette library">×</button>
+              <button className="minimal-close-btn" onClick={closeTapeMenu} aria-label="Close cassette library">×</button>
             </div>
 
             {menuTab === 'tapes' ? (
               <div className="minimal-items-grid">
-                <button
-                  className={`minimal-item ${activeTapeLabel.includes('LATE NIGHT') ? 'minimal-item--active' : ''}`}
-                  onClick={() => triggerCassetteSequence('LATE NIGHT DRIVE ♡', true)}
-                >
-                  <span className="minimal-title">Late Night Drive</span>
-                  <span className="minimal-tag">90s Bollywood</span>
+                <button className={`minimal-item minimal-item--active`}>
+                  <span className="minimal-title">Custom Mixtape</span>
+                  <span className="minimal-tag">YouTube Playlist</span>
                 </button>
-                <button
-                  className={`minimal-item ${activeTapeLabel.includes('CHILLT') ? 'minimal-item--active' : ''}`}
-                  onClick={() => triggerCassetteSequence('CHILLT DRIVE 🌙', true)}
-                >
-                  <span className="minimal-title">Chillt Drive</span>
-                  <span className="minimal-tag">Lo-fi retro</span>
-                </button>
-                <button
-                  className={`minimal-item ${activeTapeLabel.includes('OLD HINDI') ? 'minimal-item--active' : ''}`}
-                  onClick={() => triggerCassetteSequence('OLD HINDI HITS ✨', true)}
-                >
-                  <span className="minimal-title">Old Hindi Hits</span>
-                  <span className="minimal-tag">Classics</span>
-                </button>
+
+                <div className="minimal-tape-cta" style={{ gridColumn: '1 / -1', marginTop: '10px' }}>
+                  <button className="tape-cta-btn" onClick={() => setShowAddModal(true)} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px dashed rgba(255,255,255,0.3)', borderRadius: '6px', cursor: 'pointer', fontFamily: 'monospace' }}>
+                    + Add Your Playlist
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="minimal-track-list">
-                {(tracks || []).map((track, i) => {
-                  const isActive = currentTrack && (track.id === currentTrack.id || track.youtubeId === currentTrack.youtubeId);
-                  const clean = cleanTrackInfo(track?.title || '', track?.artist);
-                  return (
-                    <button
-                      key={track.id || i}
-                      className={`minimal-track-row ${isActive ? 'minimal-track-row--active' : ''}`}
-                      onClick={() => onSelectTrack(track, i)}
-                    >
-                      <span className="minimal-num">{String(i + 1).padStart(2, '0')}</span>
-                      <div className="minimal-text-col">
-                        <span className="minimal-song-title">{clean.title}</span>
-                        <span className="minimal-song-artist">{clean.artist}</span>
-                      </div>
-                      {isActive && isPlaying && <span className="minimal-now-playing">▶ PLAYING</span>}
-                    </button>
-                  );
-                })}
+              {(tracks || []).map((track, i) => {
+                const isActive = currentTrack && (track.id === currentTrack.id || track.youtubeId === currentTrack.youtubeId);
+                const clean = cleanTrackInfo(track?.title || '', track?.artist);
+                return (
+                  <button
+                    key={track.id || i}
+                    className={`minimal-track-row ${isActive ? 'minimal-track-row--active' : ''}`}
+                    onClick={() => onSelectTrack(track, i)}
+                  >
+                    <span className="minimal-num">{String(i + 1).padStart(2, '0')}</span>
+                    <div className="minimal-text-col">
+                      <span className="minimal-song-title">{clean.title}</span>
+                      <span className="minimal-song-artist">{clean.artist}</span>
+                    </div>
+                    {isActive && isPlaying && <span className="minimal-now-playing">▶ PLAYING</span>}
+                  </button>
+                );
+              })}
+            </div>
+            )}
+          </div>
+
+            {/* Attached Modal for Adding Playlist */}
+            {showAddModal && (
+              <div className="minimal-add-playlist-modal">
+                <h3 className="minimal-modal-title">Add Custom Mixtape</h3>
+                
+                <div className="minimal-modal-field">
+                  <label className="minimal-modal-label">YouTube Playlist Link</label>
+                  <input
+                    type="text"
+                    className="minimal-modal-input"
+                    placeholder="https://youtube.com/playlist?list=..."
+                    value={tempTapeLink}
+                    onChange={(e) => setTempTapeLink(e.target.value)}
+                  />
+                </div>
+                
+                <div className="minimal-modal-field">
+                  <label className="minimal-modal-label">Name Your Tape</label>
+                  <input
+                    type="text"
+                    className="minimal-modal-input"
+                    value={tempTapeName}
+                    onChange={(e) => setTempTapeName(e.target.value)}
+                  />
+                </div>
+                
+                <div className="minimal-modal-actions">
+                  <button className="minimal-modal-btn minimal-modal-btn--cancel" onClick={() => setShowAddModal(false)}>Cancel</button>
+                  <button className="minimal-modal-btn minimal-modal-btn--submit" onClick={() => {
+                    onLoadNewTape(tempTapeName || 'Custom Mixtape');
+                    setShowAddModal(false);
+                  }}>Add Tape</button>
+                </div>
               </div>
             )}
           </div>
@@ -560,6 +602,8 @@ export function CompactVintageBoombox({
           </div>
         </div>
       )}
+
+
     </div>
   );
 }
@@ -575,36 +619,28 @@ const INITIAL_TRACK: Track = {
   youtubeId: 'v8P0i9J42kE',
 };
 
-const DEFAULT_PLAYLISTS: Record<string, Track[]> = {
-  'LATE NIGHT DRIVE ♡': [
-    { id: '1', title: 'LADKI BADI ANJANI HAI', artist: 'KUCH KUCH HOTA HAI - 1998', duration: 381, youtubeId: 'v8P0i9J42kE' },
-    { id: '2', title: 'TUJHE DEKHA TOH YEH JAANA', artist: 'DDLJ - 1995', duration: 304, youtubeId: 'c25rJ1wJ5vU' },
-    { id: '3', title: 'PEHLA NASHA', artist: 'JO JEETA WOHI SIKANDAR', duration: 295, youtubeId: 'V9PVRfjEBTI' },
-    { id: '4', title: 'DIL TO PAGAL HAI', artist: 'UTTAM SINGH - 1997', duration: 338, youtubeId: 'WwJmU1rZ3y0' },
-    { id: '5', title: 'CHURA KE DIL MERA', artist: 'MAIN KHILADI TU ANARI', duration: 320, youtubeId: 'tK3Z4a2eGxE' }
-  ],
-  'CHILLT DRIVE 🌙': [
-    { id: 'c1', title: 'BAARISHEIN (LO-FI REMIX)', artist: 'ANUV JAIN - CHILL EDIT', duration: 210, youtubeId: 'V1Pl8CzNzCw' },
-    { id: 'c2', title: 'AA CHAL KE TUJHE (RETRO LOFI)', artist: 'KISHORE KUMAR - MIDNIGHT', duration: 245, youtubeId: 'gT56N8Rz5hE' },
-    { id: 'c3', title: 'CHAUDHVIN KA CHAND', artist: 'MOHAMMED RAFI - LOFI', duration: 220, youtubeId: 'mN6x0K7Gz10' },
-    { id: 'c4', title: 'LAG JA GALE (SLOWED & REVERB)', artist: 'LATA MANGESHKAR', duration: 260, youtubeId: '3vW8vN756zM' }
-  ],
-  'OLD HINDI HITS ✨': [
-    { id: 'o1', title: 'MERE SAPNO KI RANI', artist: 'KISHORE KUMAR - 1969', duration: 300, youtubeId: 'vo1MykK4u8U' },
-    { id: 'o2', title: 'ROOP TERA MASTANA', artist: 'ARADHANA - 1969', duration: 225, youtubeId: 'HenA-OUyp0s' },
-    { id: 'o3', title: 'YEH SHAAM MASTANI', artist: 'KATI PATANG - 1971', duration: 275, youtubeId: '6L6Xq36Zz10' },
-    { id: 'o4', title: 'GULABI AANKHEN', artist: 'THE TRAIN - 1970', duration: 200, youtubeId: 'hgi2MYUQgE8' }
-  ]
-};
-
 export default function App() {
   const [loading, setLoading] = useState(true);
+  const [playlistName, setPlaylistName] = useState(() => localStorage.getItem('yaadein_playlist') || 'CUSTOM MIXTAPE');
+  
+  const [tracks, setTracks] = useState<Track[]>([]);
+  
   const [currentTrack, setCurrentTrack] = useState<Track>(INITIAL_TRACK);
-  const [playlistName, setPlaylistName] = useState('LATE NIGHT DRIVE ♡');
-  const [tracks, setTracks] = useState<Track[]>(DEFAULT_PLAYLISTS['LATE NIGHT DRIVE ♡']);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [volume, setVolume] = useState(0.75);
+  
+  const [volume, setVolume] = useState(() => {
+    const savedVol = localStorage.getItem('yaadein_volume');
+    return savedVol ? parseFloat(savedVol) : 0.75;
+  });
+
+  useEffect(() => { localStorage.setItem('yaadein_volume', volume.toString()); }, [volume]);
+  useEffect(() => { localStorage.setItem('yaadein_playlist', playlistName); }, [playlistName]);
+  useEffect(() => { if (currentTrack && currentTrack.id) localStorage.setItem('yaadein_track_id', currentTrack.id); }, [currentTrack]);
+
+
+
   const ytPlayerRef = useRef<YouTubePlayer | null>(null);
   const hydratedPlaylistRef = useRef('');
 
@@ -674,9 +710,14 @@ export default function App() {
     setCurrentTrack(track);
     setProgress(0);
     setIsPlaying(autoplay);
-    if (ytPlayerRef.current && autoplay) {
-      if (playlistIndex !== undefined) ytPlayerRef.current.playVideoAt(playlistIndex);
-      else ytPlayerRef.current.playVideo();
+    if (ytPlayerRef.current) {
+      if (playlistIndex !== undefined) {
+         ytPlayerRef.current.playVideoAt(playlistIndex);
+         if (!autoplay) ytPlayerRef.current.pauseVideo();
+      } else {
+         if (autoplay) ytPlayerRef.current.loadVideoById(track.youtubeId);
+         else ytPlayerRef.current.cueVideoById(track.youtubeId);
+      }
     }
   }, []);
 
@@ -711,15 +752,16 @@ export default function App() {
 
   const handleVolumeChange = useCallback((vol: number) => {
     setVolume(vol);
-    if (ytPlayerRef.current) ytPlayerRef.current.setVolume(vol * 100);
   }, []);
 
   const hydratePlaylist = useCallback(async (player: YouTubePlayer) => {
     try {
       const videoIds = (player.getPlaylist?.() || []) as string[];
+      if (!videoIds.length) return;
+
       const visibleIds = videoIds.slice(0, 20);
       const playlistKey = visibleIds.join('|');
-      if (!playlistKey || hydratedPlaylistRef.current === playlistKey) return;
+      if (hydratedPlaylistRef.current === playlistKey) return;
 
       hydratedPlaylistRef.current = playlistKey;
       const playerTracks: Track[] = await Promise.all(visibleIds.map(async (youtubeId) => {
@@ -734,55 +776,40 @@ export default function App() {
       }));
 
       setTracks(playerTracks);
+      
+      // If we have a saved track, immediately jump to its index in the YouTube playlist
+      const savedTrackId = localStorage.getItem('yaadein_track_id');
+      if (savedTrackId) {
+        const trackIndex = playerTracks.findIndex(t => t.youtubeId === savedTrackId);
+        if (trackIndex >= 0) {
+          setCurrentTrack(playerTracks[trackIndex]);
+          player.playVideoAt(trackIndex);
+          player.pauseVideo();
+          return; // Skip the default active video fallback
+        }
+      }
+
+      // Default fallback: sync to whatever the player is naturally playing (usually index 0)
       const activeVideoId = player.getVideoData()?.video_id;
       const activeTrack = playerTracks.find((track) => track.youtubeId === activeVideoId);
       if (activeTrack) setCurrentTrack(activeTrack);
     } catch {
-      // Keep the local fallback list if YouTube has not exposed the playlist yet.
+      // Ignore errors
     }
   }, []);
 
   const handleLoadNewTape = useCallback((name: string) => {
     setPlaylistName(name);
-    const newTracks = DEFAULT_PLAYLISTS[name] || DEFAULT_PLAYLISTS['LATE NIGHT DRIVE ♡'];
-    if (newTracks.length > 0) {
-      setCurrentTrack(newTracks[0]);
-      setProgress(0);
-      setIsPlaying(false);
-    }
-    hydratedPlaylistRef.current = '';
-    if (ytPlayerRef.current) void hydratePlaylist(ytPlayerRef.current);
-  }, [hydratePlaylist]);
+  }, []);
 
   const syncCurrentTrack = useCallback(async (player: YouTubePlayer) => {
     try {
       const data = player.getVideoData();
       const duration = await player.getDuration();
-      if (data && data.video_id) {
-        setCurrentTrack((current) => ({
-          ...current,
-          id: data.video_id,
-          title: data.title || current.title,
-          artist: data.author || current.artist,
-          duration: duration || current.duration,
-          youtubeId: data.video_id,
-        }));
-        return;
-      }
       if (data && data.video_id && duration > 0) {
         setCurrentTrack((current) => current.youtubeId === data.video_id
           ? { ...current, duration }
           : current);
-        return;
-      }
-      if (data && data.video_id) {
-        setCurrentTrack((current) => current.youtubeId === data.video_id ? ({
-          id: data.video_id,
-          title: data.title || '■■■ FM 88.5 MHz - NO SIGNAL ■■■',
-          artist: data.author || 'AWAITING TRANSMISSION...',
-          duration: current.duration,
-          youtubeId: data.video_id,
-        }) : current);
       }
     } catch { /* ignore */ }
   }, []);
@@ -805,7 +832,7 @@ export default function App() {
     } else if (state === 2) {
       setIsPlaying(false);
     }
-  }, [handleNext, hydratePlaylist, syncCurrentTrack]);
+  }, [handleNext, syncCurrentTrack, hydratePlaylist]);
 
   return (
     <>
@@ -828,7 +855,7 @@ export default function App() {
           onStop={handleStop}
           onPrev={handlePrev}
           onNext={handleNext}
-          onSelectTrack={(track, index) => handleSelectTrack(track, true, index)}
+          onSelectTrack={(track) => handleSelectTrack(track, true)}
           onSeek={handleSeek}
           onVolumeChange={handleVolumeChange}
           onLoadNewTape={handleLoadNewTape}

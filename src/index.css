@@ -412,9 +412,93 @@ button { font-family: inherit; border: none; background: none; color: inherit; o
 .minimal-items-grid { gap: 0.25em; }
 .minimal-item { display: flex; min-height: 0; padding: 0.55em 0.6em; border: 0; border-radius: 0.3em; box-shadow: none; background: transparent; color: #dce7e2; }
 .minimal-item:hover { transform: none; background: rgba(255, 255, 255, 0.07); box-shadow: none; }
-.minimal-item--active { background: rgba(223, 187, 92, 0.12); box-shadow: inset 0.16em 0 #d7ad58; }
+.minimal-item--active { background: rgba(223, 187, 92, 0.12); }
 .minimal-title { font-family: var(--font-body); font-size: 0.67em; font-weight: 600; letter-spacing: 0; color: inherit; }
 .minimal-tag { margin: 0; font-size: 0.48em; color: #80948e; }
+
+/* Add Playlist Modal attached to Tape Docker */
+.minimal-add-playlist-modal {
+  position: absolute;
+  top: auto;
+  bottom: 0;
+  left: calc(100% + 17.75em); /* Right of the tape docker */
+  width: 18em;
+  background: rgba(20, 24, 22, 0.95);
+  backdrop-filter: blur(8px);
+  border: 0.08em solid rgba(198, 221, 211, 0.12);
+  border-radius: 0.4em;
+  padding: 1.2em;
+  box-shadow: 0 0.8em 2em rgba(0, 0, 0, 0.6);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+}
+
+.minimal-modal-title {
+  color: #ecdfaf;
+  font-family: var(--font-display);
+  font-size: 0.8em;
+  margin: 0 0 0.5em 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 0.06em solid rgba(223, 187, 92, 0.3);
+  padding-bottom: 0.5em;
+}
+
+.minimal-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4em;
+}
+
+.minimal-modal-label {
+  color: #829792;
+  font-size: 0.55em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.minimal-modal-input {
+  background: rgba(0, 0, 0, 0.3);
+  border: 0.08em solid rgba(198, 221, 211, 0.2);
+  border-radius: 0.25em;
+  padding: 0.6em;
+  color: #dce7e2;
+  font-family: var(--font-body);
+  font-size: 0.6em;
+  outline: none;
+}
+.minimal-modal-input:focus { border-color: rgba(223, 187, 92, 0.6); }
+
+.minimal-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5em;
+  margin-top: 0.5em;
+}
+
+.minimal-modal-btn {
+  padding: 0.6em 1em;
+  border: 0;
+  border-radius: 0.25em;
+  font-family: var(--font-body);
+  font-size: 0.55em;
+  font-weight: 600;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+.minimal-modal-btn--cancel {
+  background: transparent;
+  color: #829792;
+  border: 0.08em solid rgba(130, 151, 146, 0.4);
+}
+.minimal-modal-btn--cancel:hover { background: rgba(255, 255, 255, 0.05); }
+.minimal-modal-btn--submit {
+  background: rgba(223, 187, 92, 0.8);
+  color: #111;
+}
+.minimal-modal-btn--submit:hover { background: rgba(223, 187, 92, 1); }
 
 .minimal-track-list { gap: 0; max-height: 16em; padding-right: 0.15em; }
 .minimal-track-row { padding: 0.52em 0.45em; border-top: 0; border-bottom: 0.06em solid rgba(255, 255, 255, 0.06); background: transparent; border-radius: 0; }
@@ -427,6 +511,13 @@ button { font-family: inherit; border: none; background: none; color: inherit; o
 
 @media (max-width: 1200px) {
   .minimal-tape-menu { left: 50%; top: auto; bottom: calc(100% + 1em); width: min(20em, 85vw); max-height: min(26em, 56vh); transform: translateX(-50%) translateZ(100px); }
+  .minimal-add-playlist-modal {
+    left: 50%;
+    top: auto;
+    bottom: calc(40% + min(26em, 56vh) + 2em);
+    width: min(20em, 85vw);
+    transform: translateX(-50%) translateZ(100px);
+  }
 }
 
 @media (max-width: 600px) {
