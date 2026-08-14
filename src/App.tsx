@@ -943,6 +943,62 @@ export default function App() {
     }
   }, []);
 
+  // Set up Media Session API for mobile lock screen & media keys
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      // Ensure the image URL is absolute, as some mobile OS require it for the lock screen
+      const artworkUrl = new URL(mainScene, window.location.href).href;
+      
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentTrack.title,
+        artist: currentTrack.artist,
+        album: playlistName,
+        artwork: [
+          { src: artworkUrl, sizes: '512x512', type: 'image/png' }
+        ]
+      });
+
+      navigator.mediaSession.setActionHandler('play', handlePlayPause);
+      navigator.mediaSession.setActionHandler('pause', handlePlayPause);
+      navigator.mediaSession.setActionHandler('previoustrack', handlePrev);
+      navigator.mediaSession.setActionHandler('nexttrack', handleNext);
+    }
+  }, [currentTrack, playlistName, handlePlayPause, handlePrev, handleNext]);
+
+  // Set up Global Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in the "Add Tape" input
+      if (document.activeElement?.tagName === 'INPUT') return;
+
+      switch (e.code) {
+        case 'Space':
+          e.preventDefault();
+          handlePlayPause();
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          handleNext();
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          handlePrev();
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          handleVolumeChange(Math.min(1, volume + 0.1));
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          handleVolumeChange(Math.max(0, volume - 0.1));
+          break;
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handlePlayPause, handleNext, handlePrev, handleVolumeChange, volume]);
+
   const hydratePlaylist = useCallback(async (player: YouTubePlayer) => {
     try {
       const videoIds = (player.getPlaylist?.() || []) as string[];
@@ -1075,6 +1131,12 @@ export default function App() {
       <div className="scene" id="immersive-scene">
         <img className="scene__artwork" src={mainScene} alt="Indian Night Scene" draggable={false} />
         <div className="scene__vignette" />
+        
+        <div className="credits-badge">
+          <a href="https://arnb.in" target="_blank" rel="noopener noreferrer">arnb.in</a>
+          <a href="https://github.com/arnab-iitkgp" target="_blank" rel="noopener noreferrer">GITHUB</a>
+        </div>
+        
         <AmbientParticles />
         <RetroTitleBlock isPlaying={isPlaying} tapeName={playlistName} />
 
