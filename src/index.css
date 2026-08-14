@@ -383,25 +383,15 @@ button { font-family: inherit; border: none; background: none; color: inherit; o
   font-family: var(--font-mono); font-size: 0.43em; font-weight: 800; color: #f6d77e; letter-spacing: 0.06em;
 }
 
-@media (max-width: 1200px) {
-  .minimal-tape-menu { left: 50%; bottom: calc(100% + 1.1em); width: min(27em, 82vw); max-height: min(26em, 56vh); transform: translateX(-50%) translateZ(100px); transform-origin: center bottom; }
-  @keyframes cassette-drawer-in { from { opacity: 0; transform: translate(-50%, 0.6em) translateZ(100px); } to { opacity: 1; transform: translateX(-50%) translateZ(100px); } }
-}
-
-@media (max-width: 600px) {
-  .minimal-tape-menu { bottom: calc(100% + 0.8em); width: min(31em, 92vw); min-height: 0; padding-top: 0.85em; }
-  .minimal-menu-header { grid-template-columns: 1fr auto; }
-  .minimal-tab-bar { grid-column: 1 / -1; grid-row: 2; justify-self: start; }
-}
-
 /* Keep the dock deliberately plain: it is supporting UI, not another scene object. */
 .minimal-tape-menu {
+  position: absolute;
   left: calc(100% + 0.75em);
-  bottom: auto;
-  top: 0;
+  bottom: 0;
+  top: auto;
   width: 16em;
   min-height: 0;
-  max-height: min(22em, 58vh);
+  max-height: min(23em, 70vh);
   padding: 0.6em;
   color: #d8e3df;
   background: rgba(10, 20, 22, 0.96);
@@ -409,7 +399,6 @@ button { font-family: inherit; border: none; background: none; color: inherit; o
   border-radius: 0.45em;
   box-shadow: 0 0.8em 2em rgba(0, 0, 0, 0.58);
   transform: translateZ(50px);
-  animation: none;
 }
 
 .minimal-menu-header { display: flex; gap: 0.5em; padding: 0 0 0.55em; border-color: rgba(198, 221, 211, 0.14); }
@@ -436,17 +425,14 @@ button { font-family: inherit; border: none; background: none; color: inherit; o
 .minimal-song-artist { font-size: 0.45em; color: #78908a; }
 .minimal-track-row--active .minimal-song-title, .minimal-track-row--active .minimal-song-artist, .minimal-track-row--active .minimal-num { color: #eddda9; }
 
-@media (max-width: 1024px) {
-  .minimal-tape-menu {
-    left: 50% !important;
-    right: auto !important;
-    top: auto !important;
-    bottom: calc(100% + 0.8em) !important;
-    transform: translateX(-50%) translateZ(100px) !important;
-    width: min(20em, 90vw) !important;
-    max-height: min(24em, 65vh) !important;
-    z-index: 200 !important;
-  }
+@media (max-width: 1200px) {
+  .minimal-tape-menu { left: 50%; top: auto; bottom: calc(100% + 1em); width: min(20em, 85vw); max-height: min(26em, 56vh); transform: translateX(-50%) translateZ(100px); }
+}
+
+@media (max-width: 600px) {
+  .minimal-tape-menu { left: 50%; top: auto; bottom: calc(100% + 1.5em); width: min(24em, 92vw); transform: translateX(-50%) translateZ(100px); }
+  .minimal-menu-header { display: flex; grid-template-columns: none; }
+  .minimal-tab-bar { grid-column: auto; grid-row: auto; justify-self: stretch; }
 }
 
 .menu-close-btn {
