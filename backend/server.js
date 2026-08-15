@@ -46,6 +46,11 @@ if (process.env.YOUTUBE_COOKIES_BASE64) {
     }
 }
 
+// Health check endpoint for UptimeRobot
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'OK', timestamp: new Date() });
+});
+
 // Endpoint to fetch playlist metadata
 app.get('/playlist', (req, res) => {
     const playlistId = req.query.id;
@@ -113,13 +118,13 @@ app.get('/prefetch', (req, res) => {
     ytDlp.on('close', (code) => {
         console.log(`[Prefetch] Finished buffering ${videoId} (code ${code})`);
         const cache = streamCache.get(videoId);
-        if (cache) cache.status = 'done';
-    });
-
-    // If the client aborts the prefetch request, kill the python process to save RAM
-    req.on('close', () => {
-        if (!streamCache.get(videoId) || streamCache.get(videoId).status !== 'done') {
-            ytDlp.kill('SIGKILL');
+        if (cache) {
+            if (code === 0 && cache.chunks.length > 0) {
+                cache.status = 'done';
+            } else {
+                console.log(`[Prefetch] Buffering failed or produced empty data for ${videoId}. Evicting.`);
+                streamCache.delete(videoId);
+            }
         }
     });
 
@@ -134,14 +139,18 @@ app.get('/stream', (req, res) => {
     // Serve instantly from RAM cache if pre-fetched!
     if (streamCache.has(videoId)) {
         const cache = streamCache.get(videoId);
-        if (cache.status === 'done') {
-            console.log(`[Stream] Serving ${videoId} instantly from RAM Cache!`);
+        if (cache.status === 'done' && cache.chunks.length > 0) {
             const fullBuffer = Buffer.concat(cache.chunks);
-            res.setHeader('Content-Type', 'audio/mp4'); // format 140 is m4a
-            res.setHeader('Content-Length', fullBuffer.length);
-            res.setHeader('Accept-Ranges', 'bytes');
-            return res.send(fullBuffer);
+            if (fullBuffer.length > 0) {
+                console.log(`[Stream] Serving ${videoId} instantly from RAM Cache (${fullBuffer.length} bytes)!`);
+                res.setHeader('Content-Type', 'audio/mp4'); // format 140 is m4a
+                res.setHeader('Content-Length', fullBuffer.length);
+                res.setHeader('Accept-Ranges', 'bytes');
+                return res.send(fullBuffer);
+            }
         }
+        // If cache was invalid or empty, remove it
+        streamCache.delete(videoId);
     }
 
     console.log(`[Stream] Live streaming (no cache): ${videoId}`);
