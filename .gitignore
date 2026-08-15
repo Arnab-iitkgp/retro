@@ -26,3 +26,12 @@ dist-ssr
 # Plans and text files
 *.md
 
+# Secrets and Credentials
+.env
+cookies.json
+cookies.txt
+cookies_old.json
+cookies_old.txt
+base64_cookies.txt
+temp_playlist.json
+*player-script.js

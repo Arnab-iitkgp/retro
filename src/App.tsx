@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import YouTube, { YouTubeEvent, YouTubePlayer } from 'react-youtube';
-import { Track, YOUTUBE_PLAYLIST_ID, fetchVideoTitle, formatDuration } from './data/tracks';
+import { Track, YOUTUBE_PLAYLIST_ID, formatDuration } from './data/tracks';
 import { mechanicalAudio } from './audioEngine';
 import mainScene from '../assets/main-scene.png';
 
@@ -808,8 +807,10 @@ export default function App() {
 
 
 
-  const ytPlayerRef = useRef<YouTubePlayer | null>(null);
+
   const hydratedPlaylistRef = useRef('');
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (window.matchMedia('(hover: none)').matches) return;
@@ -859,52 +860,64 @@ export default function App() {
     };
   }, []);
 
+  const prefetchedId = useRef<string | null>(null);
+
   useEffect(() => {
     let interval: number;
     if (isPlaying) {
-      interval = window.setInterval(async () => {
-        if (ytPlayerRef.current) {
-          try {
-            const ct = await ytPlayerRef.current.getCurrentTime();
-            const dur = await ytPlayerRef.current.getDuration();
-            if (dur > 0) setProgress(ct / dur);
-          } catch { /* transition */ }
+      interval = window.setInterval(() => {
+        if (audioRef.current && audioRef.current.duration > 0) {
+          const cTime = audioRef.current.currentTime;
+          const dur = audioRef.current.duration;
+          setProgress(cTime / dur);
         }
       }, 500);
     }
     return () => clearInterval(interval);
   }, [isPlaying]);
 
+  // Immediately prefetch the next song in the background whenever the current song changes
+  useEffect(() => {
+    if (!currentTrack || tracks.length === 0) return;
+    const currentIndex = Math.max(0, tracks.findIndex((t) => t.youtubeId === currentTrack.youtubeId));
+    const nextIndex = (currentIndex + 1) % tracks.length;
+    const nextTrack = tracks[nextIndex];
+    
+    if (nextTrack && prefetchedId.current !== nextTrack.youtubeId) {
+      prefetchedId.current = nextTrack.youtubeId;
+      fetch(`${import.meta.env.VITE_BACKEND_URL || ''}/prefetch?id=${nextTrack.youtubeId}`).catch(() => {});
+    }
+  }, [currentTrack, tracks]);
+
   const handlePlayPause = useCallback(() => {
-    if (!ytPlayerRef.current) {
+    if (!audioRef.current) {
       setIsPlaying((p) => !p);
       return;
     }
-    const state = ytPlayerRef.current.getPlayerState();
-    if (state === 1) ytPlayerRef.current.pauseVideo();
-    else ytPlayerRef.current.playVideo();
+    if (audioRef.current.paused) {
+      audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+    } else {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    }
   }, []);
 
   const handleStop = useCallback(() => {
-    if (ytPlayerRef.current) ytPlayerRef.current.pauseVideo();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
     setProgress(0);
-    if (ytPlayerRef.current) ytPlayerRef.current.seekTo(0, true);
     setIsPlaying(false);
   }, []);
 
-  const handleSelectTrack = useCallback((track: Track, autoplay = true, playlistIndex?: number) => {
+  const handleSelectTrack = useCallback((track: Track, autoplay = true) => {
     setCurrentTrack(track);
     setProgress(0);
     setIsPlaying(autoplay);
-    if (ytPlayerRef.current) {
-      if (playlistIndex !== undefined) {
-         ytPlayerRef.current.playVideoAt(playlistIndex);
-         if (!autoplay) ytPlayerRef.current.pauseVideo();
-      } else {
-         if (autoplay) ytPlayerRef.current.loadVideoById(track.youtubeId);
-         else ytPlayerRef.current.cueVideoById(track.youtubeId);
-      }
-    }
+    
+    // Set the native audio source to the crack server via the Vite proxy
+    setAudioUrl(`${import.meta.env.VITE_BACKEND_URL || ''}/stream?id=${track.youtubeId}`);
   }, []);
 
   const handleNext = useCallback(() => {
@@ -917,7 +930,7 @@ export default function App() {
   const handlePrev = useCallback(() => {
     if (progress > 0.05) {
       setProgress(0);
-      ytPlayerRef.current?.seekTo(0, true);
+      if (audioRef.current) audioRef.current.currentTime = 0;
       return;
     }
     if (!tracks.length) return;
@@ -928,18 +941,15 @@ export default function App() {
 
   const handleSeek = useCallback(async (pct: number) => {
     setProgress(pct);
-    if (ytPlayerRef.current) {
-      try {
-        const dur = await ytPlayerRef.current.getDuration();
-        if (dur) ytPlayerRef.current.seekTo(pct * dur, true);
-      } catch { /* ignore */ }
+    if (audioRef.current && audioRef.current.duration) {
+      audioRef.current.currentTime = pct * audioRef.current.duration;
     }
   }, []);
 
   const handleVolumeChange = useCallback((vol: number) => {
     setVolume(vol);
-    if (ytPlayerRef.current) {
-      ytPlayerRef.current.setVolume(vol * 100);
+    if (audioRef.current) {
+      audioRef.current.volume = vol;
     }
   }, []);
 
@@ -999,49 +1009,38 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handlePlayPause, handleNext, handlePrev, handleVolumeChange, volume]);
 
-  const hydratePlaylist = useCallback(async (player: YouTubePlayer) => {
+  const hydratePlaylist = useCallback(async (pid: string) => {
+    if (!pid || hydratedPlaylistRef.current === pid) return;
+    hydratedPlaylistRef.current = pid;
+    
     try {
-      const videoIds = (player.getPlaylist?.() || []) as string[];
-      if (!videoIds.length) return;
-
-      const visibleIds = videoIds.slice(0, 20);
-      const playlistKey = visibleIds.join('|');
-      if (hydratedPlaylistRef.current === playlistKey) return;
-
-      hydratedPlaylistRef.current = playlistKey;
-      const playerTracks: Track[] = await Promise.all(visibleIds.map(async (youtubeId) => {
-        const info = await fetchVideoTitle(youtubeId);
-        return {
-          id: youtubeId,
-          youtubeId,
-          title: info.title,
-          artist: info.artist,
-          duration: 0,
-        } satisfies Track;
-      }));
-
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL || ''}/playlist?id=${pid}`);
+      if (!res.ok) throw new Error('Failed to fetch playlist from backend');
+      const data = await res.json();
+      
+      const playerTracks = data.tracks || [];
+      if (!playerTracks.length) return;
+      
       setTracks(playerTracks);
       
-      // If we have a saved track, immediately jump to its index in the YouTube playlist
       const savedTrackId = localStorage.getItem('yaadein_track_id');
       if (savedTrackId) {
-        const trackIndex = playerTracks.findIndex(t => t.youtubeId === savedTrackId);
+        const trackIndex = playerTracks.findIndex((t: Track) => t.youtubeId === savedTrackId);
         if (trackIndex >= 0) {
           setCurrentTrack(playerTracks[trackIndex]);
-          player.playVideoAt(trackIndex);
-          player.pauseVideo();
-          return; // Skip the default active video fallback
+          return;
         }
       }
-
-      // Default fallback: sync to whatever the player is naturally playing (usually index 0)
-      const activeVideoId = player.getVideoData()?.video_id;
-      const activeTrack = playerTracks.find((track) => track.youtubeId === activeVideoId);
-      if (activeTrack) setCurrentTrack(activeTrack);
-    } catch {
-      // Ignore errors
+      
+      setCurrentTrack(playerTracks[0]);
+    } catch (err) {
+      console.warn('Playlist hydrate error:', err);
     }
   }, []);
+
+  useEffect(() => {
+    hydratePlaylist(playlistId);
+  }, [playlistId, hydratePlaylist]);
 
   const handleLoadNewTape = useCallback((name: string, link?: string) => {
     setPlaylistName(name);
@@ -1052,18 +1051,15 @@ export default function App() {
         const url = new URL(extractedId);
         const listParam = url.searchParams.get('list');
         if (listParam) extractedId = listParam;
-      } catch {
-        // fallback to raw string if it's not a URL
-      }
+      } catch { /* fallback */ }
       setPlaylistId(extractedId);
-      setTracks([]); // Clear UI while new playlist loads
+      setTracks([]);
+      setAudioUrl(null);
       
       setSavedTapes((prev) => {
         if (prev.some((t) => t.id === extractedId)) return prev;
         return [...prev, { id: extractedId, name }];
       });
-      
-      // Optionally reset the saved track since it's a new playlist
       localStorage.removeItem('yaadein_track_id');
     }
   }, []);
@@ -1072,60 +1068,21 @@ export default function App() {
     setSavedTapes((prev) => prev.filter(t => t.id !== id));
   }, []);
 
-  const syncCurrentTrack = useCallback(async (player: YouTubePlayer) => {
-    try {
-      const data = player.getVideoData();
-      const duration = await player.getDuration();
-      if (data && data.video_id && duration > 0) {
-        setTracks((currentTracks) => {
-          const matchingTrack = currentTracks.find((t) => t.youtubeId === data.video_id);
-          setCurrentTrack((current) => {
-            if (current.youtubeId === data.video_id) return { ...current, duration };
-            if (matchingTrack) return { ...matchingTrack, duration };
-            return {
-              id: data.video_id,
-              youtubeId: data.video_id,
-              title: data.title || 'Unknown Track',
-              artist: data.author || 'Unknown Artist',
-              duration,
-            };
-          });
-          return currentTracks;
-        });
-      }
-    } catch { /* ignore */ }
-  }, []);
-
-  const onPlayerReady = useCallback((event: YouTubeEvent) => {
-    ytPlayerRef.current = event.target;
-    event.target.setVolume(volume * 100);
-    void hydratePlaylist(event.target);
-  }, [hydratePlaylist, volume]);
-
-  const onPlayerStateChange = useCallback((event: YouTubeEvent) => {
-    const state = event.data;
-    if (state === 1) {
-      setIsPlaying(true);
-      syncCurrentTrack(event.target);
-      void hydratePlaylist(event.target);
-    } else if (state === 0) {
-      setIsPlaying(false);
-      handleNext();
-    } else if (state === 2) {
-      setIsPlaying(false);
-    }
-  }, [handleNext, syncCurrentTrack, hydratePlaylist]);
-
-  const handlePlayerError = useCallback((event: YouTubeEvent) => {
-    console.warn('YouTube Error:', event.data, '- Skipping broken track...');
-    // Introduce a tiny delay so if multiple tracks are broken in a row, we don't spam the API infinitely in a single tick
-    setTimeout(() => {
-      handleNext();
-    }, 500);
-  }, [handleNext]);
-
   return (
     <>
+      {audioUrl && (
+        <audio 
+          ref={audioRef} 
+          src={audioUrl} 
+          autoPlay={isPlaying}
+          onEnded={handleNext}
+          onError={() => {
+             console.warn('Audio stream failed, skipping...');
+             setTimeout(handleNext, 1000);
+          }}
+        />
+      )}
+
       <LoadingScreen visible={loading} />
 
       <div className="scene" id="immersive-scene">
@@ -1161,29 +1118,6 @@ export default function App() {
           isVisible={isBoomboxVisible}
           isIdle={isIdle}
           onToggleVisibility={() => setIsBoomboxVisible(!isBoomboxVisible)}
-        />
-      </div>
-
-      <div style={{ position: 'fixed', bottom: 0, right: 0, width: '200px', height: '200px', opacity: 0.001, pointerEvents: 'none', zIndex: -999 }}>
-        <YouTube
-          key={playlistId}
-          opts={{
-            width: '200',
-            height: '200',
-            playerVars: {
-              autoplay: 0,
-              controls: 0,
-              disablekb: 1,
-              fs: 0,
-              iv_load_policy: 3,
-              listType: 'playlist' as any,
-              list: playlistId,
-              origin: window.location.origin,
-            },
-          }}
-          onReady={onPlayerReady}
-          onStateChange={onPlayerStateChange}
-          onError={handlePlayerError}
         />
       </div>
     </>
