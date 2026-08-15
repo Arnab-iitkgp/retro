@@ -116,6 +116,13 @@ app.get('/prefetch', (req, res) => {
         if (cache) cache.status = 'done';
     });
 
+    // If the client aborts the prefetch request, kill the python process to save RAM
+    req.on('close', () => {
+        if (!streamCache.get(videoId) || streamCache.get(videoId).status !== 'done') {
+            ytDlp.kill('SIGKILL');
+        }
+    });
+
     res.send('Prefetching started');
 });
 
@@ -163,6 +170,12 @@ app.get('/stream', (req, res) => {
     ytDlp.stdout.pipe(res);
     ytDlp.stderr.on('data', (d) => console.log('yt-dlp err:', d.toString()));
     ytDlp.on('close', () => res.end());
+
+    // CRITICAL: Kill the yt-dlp python process if the user skips the song!
+    // This prevents the 137 OOM Error on Render.
+    req.on('close', () => {
+        ytDlp.kill('SIGKILL');
+    });
 });
 
 const PORT = process.env.PORT || 3001;
