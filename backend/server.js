@@ -117,7 +117,9 @@ app.get('/prefetch', (req, res) => {
 
     if (fs.existsSync(txtPath)) args.push('--cookies', txtPath);
 
-    const ytDlp = spawn(ytDlpConstants.YOUTUBE_DL_PATH, args);
+    const ytDlp = spawn(ytDlpConstants.YOUTUBE_DL_PATH, args, {
+        env: { ...process.env, NODE_OPTIONS: '' } // CRITICAL: Prevent Azure App Insights from breaking yt-dlp's Node.js solver
+    });
     activePrefetchProcess = ytDlp;
     activePrefetchVideoId = videoId;
 
@@ -191,7 +193,9 @@ app.get('/stream', (req, res) => {
         args.push('--cookies', path.join(__dirname, 'cookies.txt'));
     }
 
-    const ytDlp = spawn(ytDlpConstants.YOUTUBE_DL_PATH, args);
+    const ytDlp = spawn(ytDlpConstants.YOUTUBE_DL_PATH, args, {
+        env: { ...process.env, NODE_OPTIONS: '' } // CRITICAL: Prevent Azure App Insights from breaking yt-dlp's Node.js solver
+    });
 
     ytDlp.stdout.pipe(res);
     ytDlp.stderr.on('data', (d) => console.log('yt-dlp err:', d.toString()));
