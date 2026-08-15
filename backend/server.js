@@ -111,7 +111,7 @@ app.get('/prefetch', (req, res) => {
         '-f', '140/251/bestaudio', // Prioritize fast M4A/Opus formats
         '-o', '-',
         '--js-runtimes', 'node',
-        '--extractor-args', 'youtube:player-client=default,-android_sdkless',
+        '--extractor-args', 'youtube:player-client=ios,android,web',
         '--quiet'
     ];
 
@@ -183,7 +183,7 @@ app.get('/stream', (req, res) => {
         '-f', '140/251/bestaudio', // Prioritize fast M4A/Opus formats
         '-o', '-',
         '--js-runtimes', 'node',
-        '--extractor-args', 'youtube:player-client=default,-android_sdkless',
+        '--extractor-args', 'youtube:player-client=ios,android,web',
         '--quiet'
     ];
 
