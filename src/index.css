@@ -207,7 +207,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; o
 
 /* Photorealistic dark brushed-bronze 3D mechanical switch cap */
 .top-switch-cap {
-  width: 2.3em; height: 2.1em; border-radius: 0.08em;
+  width: 3.4em; height: 2.3em; border-radius: 0.08em;
   background: linear-gradient(180deg, #615648 0%, #3a322a 50%, #201a14 85%, #120e0b 100%);
   border: 0.1em solid #7d7060;
   border-top: 0.28em solid #ffc107; /* Photorealistic warm ambient streetlight highlight rim */
@@ -226,14 +226,14 @@ button { font-family: inherit; border: none; background: none; color: inherit; o
 }
 
 .switch-icon {
-  font-size: 0.58em; color: #ffffff;
+  font-size: 0.65em; color: #ffffff;
   text-shadow: 0 0.05em 0.1em rgba(0,0,0,0.9), 0 0 0.25em rgba(255, 193, 7, 0.9);
   line-height: 1;
 }
 
 .switch-mini-label {
-  font-family: var(--font-mono); font-size: 0.35em; font-weight: 900;
-  color: #f7efe2; letter-spacing: 0.06em; text-transform: uppercase;
+  font-family: var(--font-mono); font-size: 0.6em; /* Dramatically scaled up */ font-weight: 900;
+  color: #ffdda1; letter-spacing: 0.08em; text-transform: uppercase;
   text-shadow: 0 0.08em 0.15em rgba(0,0,0,0.9); pointer-events: none;
   margin-top: 0.05em;
 }
@@ -324,7 +324,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; o
 }
 
 .minimal-tab {
-  font-family: var(--font-mono); font-size: 0.52em; font-weight: 800; letter-spacing: 0.08em;
+  font-family: var(--font-mono); font-size: 0.65em; /* Scaled up */ font-weight: 800; letter-spacing: 0.08em;
   color: #715d44; padding: 0.36em 0.45em; border-radius: 0.1em; transition: all var(--t-fast);
 }
 
@@ -441,7 +441,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; o
 
 .minimal-menu-header { display: flex; gap: 0.5em; padding: 0 0 0.55em; border-color: rgba(198, 221, 211, 0.14); }
 .minimal-tab-bar { display: flex; flex: 1; gap: 0.2em; padding: 0; background: none; border: 0; }
-.minimal-tab { flex: 1; padding: 0.42em 0.35em; border-radius: 0.25em; color: #829792; background: transparent; font-size: 0.55em; }
+.minimal-tab { flex: 1; padding: 0.42em 0.35em; border-radius: 0.25em; color: #829792; background: transparent; font-size: 0.7em; /* Scaled up from 0.55em */ }
 .minimal-tab:hover { color: #e1ede6; background: rgba(255, 255, 255, 0.06); }
 .minimal-tab--active { color: #ecdfaf; background: rgba(223, 187, 92, 0.12); box-shadow: inset 0 -0.12em #d7ad58; }
 .minimal-close-btn { width: 1.5em; height: 1.5em; color: #829792; border: 0; border-radius: 0.25em; font-size: 0.95em; }
@@ -460,23 +460,23 @@ button { font-family: inherit; border: none; background: none; color: inherit; o
   top: auto;
   bottom: 0;
   left: calc(100% + 17.75em); /* Right of the tape docker */
-  width: 18em;
+  width: 22em; /* Increased width */
   background: rgba(20, 24, 22, 0.95);
   backdrop-filter: blur(8px);
   border: 0.08em solid rgba(198, 221, 211, 0.12);
-  border-radius: 0.4em;
-  padding: 1.2em;
+  border-radius: 0.6em;
+  padding: 1.6em; /* Increased padding */
   box-shadow: 0 0.8em 2em rgba(0, 0, 0, 0.6);
   z-index: 100;
   display: flex;
   flex-direction: column;
-  gap: 1em;
+  gap: 1.2em;
 }
 
 .minimal-modal-title {
   color: #ecdfaf;
   font-family: var(--font-display);
-  font-size: 0.8em;
+  font-size: 1.1em; /* Scaled up from 0.8em */
   margin: 0 0 0.5em 0;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -492,7 +492,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; o
 
 .minimal-modal-label {
   color: #829792;
-  font-size: 0.55em;
+  font-size: 0.75em; /* Scaled up from 0.55em */
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -500,11 +500,11 @@ button { font-family: inherit; border: none; background: none; color: inherit; o
 .minimal-modal-input {
   background: rgba(0, 0, 0, 0.3);
   border: 0.08em solid rgba(198, 221, 211, 0.2);
-  border-radius: 0.25em;
-  padding: 0.6em;
+  border-radius: 0.3em;
+  padding: 0.8em; /* Scaled up padding */
   color: #dce7e2;
   font-family: var(--font-body);
-  font-size: 0.6em;
+  font-size: 0.85em; /* Scaled up from 0.6em */
   outline: none;
 }
 .minimal-modal-input:focus { border-color: rgba(223, 187, 92, 0.6); }
@@ -517,11 +517,11 @@ button { font-family: inherit; border: none; background: none; color: inherit; o
 }
 
 .minimal-modal-btn {
-  padding: 0.6em 1em;
+  padding: 0.8em 1.2em; /* Scaled up padding */
   border: 0;
-  border-radius: 0.25em;
+  border-radius: 0.3em;
   font-family: var(--font-body);
-  font-size: 0.55em;
+  font-size: 0.75em; /* Scaled up from 0.55em */
   font-weight: 600;
   cursor: pointer;
   text-transform: uppercase;
@@ -559,7 +559,20 @@ button { font-family: inherit; border: none; background: none; color: inherit; o
 }
 
 @media (max-width: 600px) {
-  .minimal-tape-menu { left: 50%; top: auto; bottom: calc(100% + 1.5em); width: min(24em, 92vw); transform: translateX(-50%) translateZ(100px); }
+  .minimal-tape-menu { 
+    left: 42%; 
+    top: auto; 
+    bottom: calc(100% + 3.5em); 
+    width: min(24em, 92vw); 
+    transform: translateX(-50%) translateZ(100px); 
+  }
+  .minimal-add-playlist-modal {
+    left: 42%; 
+    top: auto;
+    bottom: calc(40% + min(26em, 56vh) + 4.5em); 
+    width: min(24em, 92vw);
+    transform: translateX(-50%) translateZ(100px);
+  }
   .minimal-menu-header { display: flex; grid-template-columns: none; }
   .minimal-tab-bar { grid-column: auto; grid-row: auto; justify-self: stretch; }
 }
@@ -1168,6 +1181,7 @@ button { font-family: inherit; border: none; background: none; color: inherit; o
    RESPONSIVE LAYOUT
    ============================================ */
 @media (max-width: 600px) {
+  .title { top: 28%; }
   .speaker-housing { display: none; }
   .box-face--right { display: none; }
   .center-console { width: 100%; }
