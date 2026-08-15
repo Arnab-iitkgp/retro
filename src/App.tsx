@@ -126,9 +126,6 @@ function RetroTitleBlock({ isPlaying, tapeName }: { isPlaying: boolean; tapeName
       <h1 className="title__hindi">यादें</h1>
       <p className="title__name">Yaadein Cassettes</p>
       <p className="title__tagline">Late Night Tapes</p>
-      <div className="title__context">
-        {isPlaying ? 'NOW PLAYING' : 'BROADCASTING'} · {tapeName.replace(' ♡', '').toUpperCase()}
-      </div>
     </div>
   );
 }
@@ -613,13 +610,7 @@ export function CompactVintageBoombox({
                 >
                   {isPlaying ? Icons.pause : Icons.play}
                 </button>
-                <button
-                  className={`piano-key-btn ${activePianoBtn === 'stop' ? 'piano-key-btn--pressed' : ''}`}
-                  onClick={() => triggerPianoBtn('stop', onStop)}
-                  title="Stop"
-                >
-                  {Icons.stop}
-                </button>
+
                 <button 
                   className={`piano-key-btn ${activePianoBtn === 'next' ? 'piano-key-btn--pressed' : ''}`} 
                   onClick={() => triggerPianoBtn('next', onNext)} 
@@ -707,8 +698,8 @@ export function CompactVintageBoombox({
         <div className="mini-progress-track" onClick={handleSeekClick}>
           <div className="mini-progress-bar" style={{ width: `${progress * 100}%` }} />
         </div>
-        <button className="mini-btn" onClick={onToggleVisibility} title="Show Boombox">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <button className="mini-btn mini-btn--toggle" onClick={onToggleVisibility} title="Show Boombox">
+          <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect>
             <circle cx="7" cy="13" r="2.5"></circle>
             <circle cx="17" cy="13" r="2.5"></circle>
@@ -730,14 +721,18 @@ export function CompactVintageBoombox({
           {Icons.next}
         </button>
         <button className="mini-btn mini-btn--menu" onClick={() => {
-          onToggleVisibility();
+          if (!isPseudoMobile) {
+            onToggleVisibility();
+          }
           setMenuTab('tracks');
           setShowTapeMenu(true);
         }}>
           TRACKS
         </button>
         <button className="mini-btn mini-btn--menu" onClick={() => {
-          onToggleVisibility();
+          if (!isPseudoMobile) {
+            onToggleVisibility();
+          }
           setMenuTab('tapes');
           setShowTapeMenu(true);
         }}>
@@ -794,6 +789,7 @@ export default function App() {
   const [progress, setProgress] = useState(0);
   const [isBoomboxVisible, setIsBoomboxVisible] = useState(true);
   const [isIdle, setIsIdle] = useState(false);
+  const [isPseudoMobile, setIsPseudoMobile] = useState(false);
   
   const [volume, setVolume] = useState(() => {
     const savedVol = localStorage.getItem('yaadein_volume');
@@ -812,7 +808,13 @@ export default function App() {
   const hydratedPlaylistRef = useRef('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [useIframeFallback, setUseIframeFallback] = useState(() => import.meta.env.VITE_FORCE_IFRAME === 'true');
+  const [useIframeFallback, setUseIframeFallback] = useState(() => {
+    try {
+      return import.meta.env.VITE_FORCE_IFRAME === 'true' || localStorage.getItem('yaadein_use_iframe') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const ytPlayerRef = useRef<any>(null);
 
   useEffect(() => {
@@ -842,6 +844,27 @@ export default function App() {
     img.src = mainScene;
     img.onload = () => setTimeout(() => setLoading(false), 500);
     img.onerror = () => setTimeout(() => setLoading(false), 500);
+  }, []);
+
+  // Detect mobile devices even when "Request Desktop Site" lies about User Agent
+  useEffect(() => {
+    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || 
+      (isTouch && window.screen.width <= 1366);
+    
+    // Only activate pseudo-mobile if on mobile AND requested Desktop Site (viewport width > 600px)
+    const isDesktopModeOnMobile = isMobileDevice && window.innerWidth > 600;
+    
+    console.log("MOBILE DETECTION STATE:", {
+      isTouch,
+      screenWidth: window.screen.width,
+      innerWidth: window.innerWidth,
+      isMobileDevice,
+      isDesktopModeOnMobile,
+      userAgent: navigator.userAgent
+    });
+    
+    setIsPseudoMobile(isDesktopModeOnMobile);
   }, []);
 
   useEffect(() => {
@@ -889,6 +912,7 @@ export default function App() {
 
   // Immediately prefetch the next song in the background whenever the current song changes
   useEffect(() => {
+    if (useIframeFallback) return; // Skip prefetch in iframe mode to prevent server CPU hogging
     if (!currentTrack || tracks.length === 0) return;
     const currentIndex = Math.max(0, tracks.findIndex((t) => t.youtubeId === currentTrack.youtubeId));
     const nextIndex = (currentIndex + 1) % tracks.length;
@@ -898,7 +922,7 @@ export default function App() {
       prefetchedId.current = nextTrack.youtubeId;
       fetch(`${import.meta.env.VITE_BACKEND_URL || ''}/prefetch?id=${nextTrack.youtubeId}`).catch(() => {});
     }
-  }, [currentTrack, tracks]);
+  }, [currentTrack, tracks, useIframeFallback]);
 
   const handlePlayPause = useCallback(() => {
     if (useIframeFallback) {
@@ -1032,6 +1056,13 @@ export default function App() {
     }
   }, [currentTrack, playlistName, handlePlayPause, handlePrev, handleNext]);
 
+  // Sync Media Session Playback State
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+    }
+  }, [isPlaying]);
+
   // Set up Global Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1146,7 +1177,7 @@ export default function App() {
   }, []);
 
   return (
-    <>
+    <div className={isPseudoMobile ? 'pseudo-mobile' : ''} style={{ width: '100%', height: '100%' }}>
       {!useIframeFallback && audioUrl && (
         <audio 
           ref={audioRef} 
@@ -1156,17 +1187,20 @@ export default function App() {
           onError={() => {
              console.warn('Audio stream failed, falling back to YouTube Iframe player...');
              setUseIframeFallback(true);
+             try {
+               localStorage.setItem('yaadein_use_iframe', 'true');
+             } catch (e) { /* ignore */ }
           }}
         />
       )}
 
       {useIframeFallback && (
-        <div style={{ position: 'fixed', left: '-9999px', top: '-9999px', width: '200px', height: '200px', zIndex: -999 }}>
+        <div style={{ position: 'fixed', left: 0, top: 0, width: '1px', height: '1px', opacity: 0.001, pointerEvents: 'none', zIndex: -999, overflow: 'hidden' }}>
           <YouTube
             videoId={currentTrack.youtubeId}
             opts={{
-              width: '200',
-              height: '200',
+              width: '1',
+              height: '1',
               playerVars: {
                 autoplay: isPlaying ? 1 : 0,
                 controls: 0,
@@ -1238,6 +1272,6 @@ export default function App() {
           onToggleVisibility={() => setIsBoomboxVisible(!isBoomboxVisible)}
         />
       </div>
-    </>
+    </div>
   );
 }
