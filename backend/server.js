@@ -115,7 +115,7 @@ app.get('/prefetch', (req, res) => {
         '--quiet'
     ];
 
-    if (fs.existsSync(txtPath)) args.push('--cookies', txtPath);
+    // Cookies removed to allow iOS/Android clients to bypass Datacenter IP blocks
 
     const ytDlp = spawn(ytDlpConstants.YOUTUBE_DL_PATH, args, {
         env: { ...process.env, NODE_OPTIONS: '' } // CRITICAL: Prevent Azure App Insights from breaking yt-dlp's Node.js solver
@@ -187,12 +187,7 @@ app.get('/stream', (req, res) => {
         '--quiet'
     ];
 
-    if (fs.existsSync(txtPath)) {
-        args.push('--cookies', txtPath);
-    } else if (fs.existsSync(path.join(__dirname, 'cookies.txt'))) {
-        args.push('--cookies', path.join(__dirname, 'cookies.txt'));
-    }
-
+    // Cookies removed to allow iOS/Android clients to bypass Datacenter IP blocks
     const ytDlp = spawn(ytDlpConstants.YOUTUBE_DL_PATH, args, {
         env: { ...process.env, NODE_OPTIONS: '' } // CRITICAL: Prevent Azure App Insights from breaking yt-dlp's Node.js solver
     });
