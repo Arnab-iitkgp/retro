@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import YouTube from 'react-youtube';
 import { Track, YOUTUBE_PLAYLIST_ID, formatDuration } from './data/tracks';
 import { mechanicalAudio } from './audioEngine';
 import mainScene from '../assets/main-scene.png';
@@ -811,6 +812,8 @@ export default function App() {
   const hydratedPlaylistRef = useRef('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [useIframeFallback, setUseIframeFallback] = useState(false);
+  const ytPlayerRef = useRef<any>(null);
 
   useEffect(() => {
     if (window.matchMedia('(hover: none)').matches) return;
@@ -866,7 +869,15 @@ export default function App() {
     let interval: number;
     if (isPlaying) {
       interval = window.setInterval(() => {
-        if (audioRef.current && audioRef.current.duration > 0) {
+        if (useIframeFallback && ytPlayerRef.current) {
+          try {
+            const cTime = ytPlayerRef.current.getCurrentTime();
+            const dur = ytPlayerRef.current.getDuration();
+            if (dur > 0) {
+              setProgress(cTime / dur);
+            }
+          } catch (e) { /* ignore */ }
+        } else if (audioRef.current && audioRef.current.duration > 0) {
           const cTime = audioRef.current.currentTime;
           const dur = audioRef.current.duration;
           setProgress(cTime / dur);
@@ -874,7 +885,7 @@ export default function App() {
       }, 500);
     }
     return () => clearInterval(interval);
-  }, [isPlaying]);
+  }, [isPlaying, useIframeFallback]);
 
   // Immediately prefetch the next song in the background whenever the current song changes
   useEffect(() => {
@@ -890,6 +901,26 @@ export default function App() {
   }, [currentTrack, tracks]);
 
   const handlePlayPause = useCallback(() => {
+    if (useIframeFallback) {
+      if (ytPlayerRef.current) {
+        try {
+          const playerState = ytPlayerRef.current.getPlayerState();
+          if (playerState === 1) { // playing
+            ytPlayerRef.current.pauseVideo();
+            setIsPlaying(false);
+          } else {
+            ytPlayerRef.current.playVideo();
+            setIsPlaying(true);
+          }
+        } catch (e) {
+          setIsPlaying((p) => !p);
+        }
+      } else {
+        setIsPlaying((p) => !p);
+      }
+      return;
+    }
+
     if (!audioRef.current) {
       setIsPlaying((p) => !p);
       return;
@@ -900,25 +931,42 @@ export default function App() {
       audioRef.current.pause();
       setIsPlaying(false);
     }
-  }, []);
+  }, [useIframeFallback]);
 
   const handleStop = useCallback(() => {
-    if (audioRef.current) {
+    if (useIframeFallback) {
+      if (ytPlayerRef.current) {
+        try {
+          ytPlayerRef.current.pauseVideo();
+          ytPlayerRef.current.seekTo(0, true);
+        } catch (e) { /* ignore */ }
+      }
+    } else if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
     setProgress(0);
     setIsPlaying(false);
-  }, []);
+  }, [useIframeFallback]);
 
   const handleSelectTrack = useCallback((track: Track, autoplay = true) => {
     setCurrentTrack(track);
     setProgress(0);
     setIsPlaying(autoplay);
     
-    // Set the native audio source to the crack server via the Vite proxy
-    setAudioUrl(`${import.meta.env.VITE_BACKEND_URL || ''}/stream?id=${track.youtubeId}`);
-  }, []);
+    if (useIframeFallback && ytPlayerRef.current) {
+      try {
+        ytPlayerRef.current.loadVideoById(track.youtubeId);
+        if (autoplay) {
+          ytPlayerRef.current.playVideo();
+        } else {
+          ytPlayerRef.current.pauseVideo();
+        }
+      } catch (e) { /* ignore */ }
+    } else {
+      setAudioUrl(`${import.meta.env.VITE_BACKEND_URL || ''}/stream?id=${track.youtubeId}`);
+    }
+  }, [useIframeFallback]);
 
   const handleNext = useCallback(() => {
     if (!tracks.length) return;
@@ -941,17 +989,26 @@ export default function App() {
 
   const handleSeek = useCallback(async (pct: number) => {
     setProgress(pct);
-    if (audioRef.current && audioRef.current.duration) {
+    if (useIframeFallback && ytPlayerRef.current) {
+      try {
+        const dur = ytPlayerRef.current.getDuration();
+        if (dur) ytPlayerRef.current.seekTo(pct * dur, true);
+      } catch (e) { /* ignore */ }
+    } else if (audioRef.current && audioRef.current.duration) {
       audioRef.current.currentTime = pct * audioRef.current.duration;
     }
-  }, []);
+  }, [useIframeFallback]);
 
   const handleVolumeChange = useCallback((vol: number) => {
     setVolume(vol);
-    if (audioRef.current) {
+    if (useIframeFallback && ytPlayerRef.current) {
+      try {
+        ytPlayerRef.current.setVolume(vol * 100);
+      } catch (e) { /* ignore */ }
+    } else if (audioRef.current) {
       audioRef.current.volume = vol;
     }
-  }, []);
+  }, [useIframeFallback]);
 
   // Set up Media Session API for mobile lock screen & media keys
   useEffect(() => {
@@ -1008,6 +1065,26 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handlePlayPause, handleNext, handlePrev, handleVolumeChange, volume]);
+
+  useEffect(() => {
+    if (useIframeFallback && ytPlayerRef.current) {
+      try {
+        if (isPlaying) {
+          ytPlayerRef.current.playVideo();
+        } else {
+          ytPlayerRef.current.pauseVideo();
+        }
+      } catch (e) { /* ignore */ }
+    }
+  }, [isPlaying, useIframeFallback]);
+
+  useEffect(() => {
+    if (useIframeFallback && ytPlayerRef.current) {
+      try {
+        ytPlayerRef.current.setVolume(volume * 100);
+      } catch (e) { /* ignore */ }
+    }
+  }, [volume, useIframeFallback]);
 
   const hydratePlaylist = useCallback(async (pid: string) => {
     if (!pid || hydratedPlaylistRef.current === pid) return;
@@ -1070,17 +1147,57 @@ export default function App() {
 
   return (
     <>
-      {audioUrl && (
+      {!useIframeFallback && audioUrl && (
         <audio 
           ref={audioRef} 
           src={audioUrl} 
           autoPlay={isPlaying}
           onEnded={handleNext}
           onError={() => {
-             console.warn('Audio stream failed, skipping...');
-             setTimeout(handleNext, 1000);
+             console.warn('Audio stream failed, falling back to YouTube Iframe player...');
+             setUseIframeFallback(true);
           }}
         />
+      )}
+
+      {useIframeFallback && (
+        <div style={{ position: 'fixed', bottom: 0, right: 0, width: '200px', height: '200px', opacity: 0.001, pointerEvents: 'none', zIndex: -999 }}>
+          <YouTube
+            videoId={currentTrack.youtubeId}
+            opts={{
+              width: '200',
+              height: '200',
+              playerVars: {
+                autoplay: isPlaying ? 1 : 0,
+                controls: 0,
+                disablekb: 1,
+                fs: 0,
+                iv_load_policy: 3,
+                origin: window.location.origin,
+              },
+            }}
+            onReady={(event) => {
+              ytPlayerRef.current = event.target;
+              event.target.setVolume(volume * 100);
+              if (isPlaying) event.target.playVideo();
+            }}
+            onStateChange={(event) => {
+              const state = event.data;
+              if (state === 1) { // PLAYING
+                setIsPlaying(true);
+              } else if (state === 0) { // ENDED
+                setIsPlaying(false);
+                handleNext();
+              } else if (state === 2) { // PAUSED
+                setIsPlaying(false);
+              }
+            }}
+            onError={() => {
+              console.warn('YouTube Iframe error, skipping to next...');
+              setTimeout(handleNext, 1000);
+            }}
+          />
+        </div>
       )}
 
       <LoadingScreen visible={loading} />
