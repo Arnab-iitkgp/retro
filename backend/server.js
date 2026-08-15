@@ -6,6 +6,8 @@ const ytDlpConstants = require('youtube-dl-exec/src/constants');
 
 // In-memory RAM cache for gapless playback (max 3 songs to prevent RAM leak on free hosts)
 const streamCache = new Map();
+let activePrefetchProcess = null;
+let activePrefetchVideoId = null;
 
 const app = express();
 app.use(cors());
@@ -46,6 +48,11 @@ if (process.env.YOUTUBE_COOKIES_BASE64) {
     }
 }
 
+// Health check endpoint for UptimeRobot
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'OK', timestamp: new Date() });
+});
+
 // Endpoint to fetch playlist metadata
 app.get('/playlist', (req, res) => {
     const playlistId = req.query.id;
@@ -81,6 +88,13 @@ app.get('/prefetch', (req, res) => {
         return res.send('Already in cache');
     }
 
+    // CRITICAL: Kill the previous active prefetch process to prevent 512MB RAM OOM crash
+    if (activePrefetchProcess) {
+        console.log(`[Prefetch] Killing previous prefetch process for ${activePrefetchVideoId} to save memory`);
+        activePrefetchProcess.kill('SIGKILL');
+        streamCache.delete(activePrefetchVideoId);
+    }
+
     // Auto-Garbage Collection: Prevent memory leaks on 512MB Free Tier hosts
     if (streamCache.size >= 3) {
         const oldestKey = streamCache.keys().next().value;
@@ -104,6 +118,8 @@ app.get('/prefetch', (req, res) => {
     if (fs.existsSync(txtPath)) args.push('--cookies', txtPath);
 
     const ytDlp = spawn(ytDlpConstants.YOUTUBE_DL_PATH, args);
+    activePrefetchProcess = ytDlp;
+    activePrefetchVideoId = videoId;
 
     ytDlp.stdout.on('data', (chunk) => {
         const cache = streamCache.get(videoId);
@@ -112,14 +128,20 @@ app.get('/prefetch', (req, res) => {
 
     ytDlp.on('close', (code) => {
         console.log(`[Prefetch] Finished buffering ${videoId} (code ${code})`);
+        if (activePrefetchVideoId === videoId) {
+            activePrefetchProcess = null;
+            activePrefetchVideoId = null;
+        }
+        
         const cache = streamCache.get(videoId);
-        if (cache) cache.status = 'done';
-    });
-
-    // If the client aborts the prefetch request, kill the python process to save RAM
-    req.on('close', () => {
-        if (!streamCache.get(videoId) || streamCache.get(videoId).status !== 'done') {
-            ytDlp.kill('SIGKILL');
+        if (cache) {
+            // Only set to done if yt-dlp succeeded and downloaded actual data!
+            if (code === 0 && cache.chunks.length > 0) {
+                cache.status = 'done';
+            } else {
+                console.log(`[Prefetch] Buffering failed or produced empty data for ${videoId}. Evicting.`);
+                streamCache.delete(videoId);
+            }
         }
     });
 
@@ -134,14 +156,18 @@ app.get('/stream', (req, res) => {
     // Serve instantly from RAM cache if pre-fetched!
     if (streamCache.has(videoId)) {
         const cache = streamCache.get(videoId);
-        if (cache.status === 'done') {
-            console.log(`[Stream] Serving ${videoId} instantly from RAM Cache!`);
+        if (cache.status === 'done' && cache.chunks.length > 0) {
             const fullBuffer = Buffer.concat(cache.chunks);
-            res.setHeader('Content-Type', 'audio/mp4'); // format 140 is m4a
-            res.setHeader('Content-Length', fullBuffer.length);
-            res.setHeader('Accept-Ranges', 'bytes');
-            return res.send(fullBuffer);
+            if (fullBuffer.length > 0) {
+                console.log(`[Stream] Serving ${videoId} instantly from RAM Cache (${fullBuffer.length} bytes)!`);
+                res.setHeader('Content-Type', 'audio/mp4'); // format 140 is m4a
+                res.setHeader('Content-Length', fullBuffer.length);
+                res.setHeader('Accept-Ranges', 'bytes');
+                return res.send(fullBuffer);
+            }
         }
+        // If cache was invalid/empty, evict it
+        streamCache.delete(videoId);
     }
 
     console.log(`[Stream] Live streaming (no cache): ${videoId}`);
