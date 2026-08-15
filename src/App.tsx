@@ -812,7 +812,7 @@ export default function App() {
   const hydratedPlaylistRef = useRef('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [useIframeFallback, setUseIframeFallback] = useState(false);
+  const [useIframeFallback, setUseIframeFallback] = useState(() => import.meta.env.VITE_FORCE_IFRAME === 'true');
   const ytPlayerRef = useRef<any>(null);
 
   useEffect(() => {
@@ -1161,7 +1161,7 @@ export default function App() {
       )}
 
       {useIframeFallback && (
-        <div style={{ position: 'fixed', bottom: 0, right: 0, width: '200px', height: '200px', opacity: 0.001, pointerEvents: 'none', zIndex: -999 }}>
+        <div style={{ position: 'fixed', left: '-9999px', top: '-9999px', width: '200px', height: '200px', zIndex: -999 }}>
           <YouTube
             videoId={currentTrack.youtubeId}
             opts={{
@@ -1174,6 +1174,7 @@ export default function App() {
                 fs: 0,
                 iv_load_policy: 3,
                 origin: window.location.origin,
+                playsinline: 1, // CRITICAL: Bypasses iOS native full-screen takeover
               },
             }}
             onReady={(event) => {
