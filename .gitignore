@@ -33,5 +33,6 @@ cookies.txt
 cookies_old.json
 cookies_old.txt
 base64_cookies.txt
+*base64.txt
 temp_playlist.json
 *player-script.js
