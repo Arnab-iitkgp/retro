@@ -166,7 +166,7 @@ app.get('/stream', (req, res) => {
                 return res.send(fullBuffer);
             }
         }
-        // If cache was invalid/empty, evict it
+        // If cache was invalid or empty, remove it
         streamCache.delete(videoId);
     }
 
