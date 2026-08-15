@@ -120,7 +120,7 @@ function LoadingScreen({ visible }: { visible: boolean }) {
   );
 }
 
-function RetroTitleBlock({ isPlaying, tapeName }: { isPlaying: boolean; tapeName: string }) {
+function RetroTitleBlock({ isPlaying: _isPlaying, tapeName: _tapeName }: { isPlaying: boolean; tapeName: string }) {
   return (
     <div className="title" id="editorial-title">
       <h1 className="title__hindi">यादें</h1>
@@ -163,6 +163,7 @@ interface BoomboxProps {
   isVisible: boolean;
   isIdle: boolean;
   onToggleVisibility: () => void;
+  isPseudoMobile: boolean;
 }
 
 export function CompactVintageBoombox({
@@ -186,6 +187,7 @@ export function CompactVintageBoombox({
   isVisible,
   isIdle,
   onToggleVisibility,
+  isPseudoMobile,
 }: BoomboxProps) {
   const [tapeStage, setTapeStage] = useState<CassetteStage>('loaded');
   const [activeTapeLabel, setActiveTapeLabel] = useState(playlistName || 'CUSTOM MIXTAPE');
@@ -1270,6 +1272,7 @@ export default function App() {
           isVisible={isBoomboxVisible}
           isIdle={isIdle}
           onToggleVisibility={() => setIsBoomboxVisible(!isBoomboxVisible)}
+          isPseudoMobile={isPseudoMobile}
         />
       </div>
     </div>
